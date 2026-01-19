@@ -1,0 +1,8 @@
+{
+  "name": "Supr Organic",
+  "description": "Premium modern e-commerce platform for aeroponic saffron and sustainably farmed mushrooms.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
