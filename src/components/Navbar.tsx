@@ -1,173 +1,138 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, User, Menu, X, LogOut, Settings, Package, Sparkles, Leaf, Heart } from 'lucide-react';
+import { ShoppingBag, Menu, X, User } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
+import { AuthModal } from './AuthModal';
+import { CheckoutModal } from './CheckoutModal';
 
-interface NavbarProps {
-  onMenuClick: () => void;
-  onCartClick: () => void;
-  onAuthClick: () => void;
-  isMenuOpen: boolean;
-}
-
-export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, onCartClick, onAuthClick, isMenuOpen }) => {
-  const cartCtx = useContext(CartContext);
-  const auth = useContext(AuthContext);
+export const Navbar: React.FC = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  
+  const cartContext = useContext(CartContext);
+  const { user, signOut } = useContext(AuthContext)!;
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Helper to check if link is active
-  const isActive = (path: string) => location.pathname === path;
+  const handleCartClick = () => {
+    if (cartContext?.cartCount === 0) return;
+    setIsCheckoutOpen(true);
+  };
+
+  // --- NEW SCROLL HANDLER ---
+  const scrollToSection = (sectionId: string) => {
+    // 1. If we are not on Home page, go there first
+    if (location.pathname !== '/') {
+      navigate('/');
+      // Wait for navigation, then scroll (handled by Home.tsx useEffect)
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } else {
+      // 2. If already on Home, just scroll
+      const element = document.getElementById(sectionId);
+      if (element) element.scrollIntoView({ behavior: 'smooth' });
+    }
+    setIsMenuOpen(false);
+  };
+
+  const scrollToTop = () => {
+    if (location.pathname !== '/') {
+      navigate('/');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    setIsMenuOpen(false);
+  };
 
   return (
-    <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-20">
-          
-          {/* Logo */}
-          <Link to="/" className="flex-shrink-0 flex items-center gap-2 group">
-            <div className="w-10 h-10 bg-emerald-600 rounded-lg flex items-center justify-center text-white font-bold group-hover:bg-emerald-700 transition-colors">SO</div>
-            <span className="text-2xl font-serif font-bold tracking-tight text-slate-900">
-              Supr <span className="text-emerald-600">Organic</span>
-            </span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
-            <Link 
-              to="/" 
-              className={`text-sm font-medium transition-colors ${isActive('/') ? 'text-emerald-600 font-bold' : 'text-slate-600 hover:text-emerald-600'}`}
-            >
-              Mushrooms
-            </Link>
-            
-            <Link 
-              to="/chef" 
-              className={`text-sm font-medium transition-colors flex items-center gap-1.5 ${isActive('/chef') ? 'text-emerald-600 font-bold' : 'text-slate-600 hover:text-emerald-600'}`}
-            >
-               <Sparkles size={16} className={isActive('/chef') ? 'text-emerald-600' : 'text-amber-500'}/> AI Chef
-            </Link>
-
-            <span className="text-sm font-medium text-slate-400 cursor-not-allowed" title="Harvesting Soon">Saffron (Soon)</span>
-            
-            <a href="#labs" className="text-sm font-medium text-slate-600 hover:text-emerald-600 transition-colors">Our Labs</a>
-          </div>
-
-          {/* Right Side Icons */}
-          <div className="flex items-center space-x-2 sm:space-x-4">
-            
-            {/* Wishlist Button (New) */}
-            <Link 
-              to="/wishlist" 
-              className={`p-2 transition-colors ${isActive('/wishlist') ? 'text-red-500' : 'text-slate-600 hover:text-red-500'}`}
-              title="My Wishlist"
-            >
-              <Heart size={22} fill={isActive('/wishlist') ? "currentColor" : "none"} />
-            </Link>
-
-            {/* Cart Button */}
-            <button onClick={onCartClick} className="p-2 text-slate-600 hover:text-emerald-600 relative transition-colors">
-              <ShoppingCart size={22} />
-              {cartCtx && cartCtx.totalItems > 0 && (
-                <span className="absolute top-0 right-0 bg-emerald-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full ring-2 ring-white animate-bounce-short">
-                  {cartCtx.totalItems}
-                </span>
-              )}
+    <>
+      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md border-b border-slate-100 transition-all duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-20">
+            {/* Logo - Also scrolls to top */}
+            <button onClick={scrollToTop} className="flex items-center gap-2 group">
+              <div className="w-10 h-10 bg-emerald-600 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-emerald-600/20 group-hover:scale-105 transition-transform">
+                SO
+              </div>
+              <span className="text-2xl font-serif font-bold text-slate-900 tracking-tight">Supr Organic</span>
             </button>
-            
-            {/* Desktop Auth Buttons */}
-            {auth?.user ? (
-               <div className="hidden md:flex items-center gap-3 pl-4 border-l border-slate-200">
-                  {auth.isAdmin ? (
-                    <Link 
-                      to="/admin" 
-                      className={`p-2 rounded-full transition-colors ${isActive('/admin') ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200'}`}
-                      title="Admin Dashboard"
-                    >
-                      <Settings size={18} />
-                    </Link>
-                  ) : (
-                    <Link 
-                      to="/orders" 
-                      className={`p-2 rounded-full transition-colors ${isActive('/orders') ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 hover:bg-slate-200'}`}
-                      title="My Orders"
-                    >
-                      <Package size={18} />
-                    </Link>
-                  )}
-                  <div className="text-right hidden lg:block mr-2">
-                    <p className="text-xs text-slate-400">Welcome,</p>
-                    <p className="text-sm font-bold text-slate-900 truncate max-w-[100px]">{auth.user.full_name || 'User'}</p>
-                  </div>
-                  <button 
-                    onClick={() => { auth.signOut(); navigate('/'); }} 
-                    className="p-2 bg-slate-100 rounded-full hover:bg-red-50 hover:text-red-500 transition-colors"
-                    title="Sign Out"
-                  >
-                    <LogOut size={18} />
-                  </button>
-               </div>
-            ) : (
-              <button 
-                onClick={onAuthClick} 
-                className="hidden md:flex items-center space-x-2 bg-slate-900 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-emerald-600 transition-all shadow-lg shadow-slate-200"
-              >
-                <User size={18} /><span>Login</span>
-              </button>
-            )}
 
-            {/* Mobile Menu Toggle */}
-            <button onClick={onMenuClick} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Mobile Menu Dropdown */}
-      {isMenuOpen && (
-        <div className="md:hidden border-t border-slate-100 bg-white absolute w-full left-0 shadow-xl animate-in slide-in-from-top-5 z-40">
-          <div className="px-4 py-6 space-y-4">
-            <Link to="/" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
-              <Leaf size={18} className="text-emerald-600"/> Mushrooms
-            </Link>
-            <Link to="/chef" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
-              <Sparkles size={18} className="text-amber-500"/> AI Chef
-            </Link>
-            <Link to="/wishlist" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
-              <Heart size={18} className="text-red-500"/> My Wishlist
-            </Link>
-            
-            <div className="border-t border-slate-100 my-4 pt-4">
-              {auth?.user ? (
-                <>
-                  <div className="px-3 mb-4">
-                    <p className="text-xs text-slate-400">Signed in as</p>
-                    <p className="font-bold text-slate-900">{auth.user.email}</p>
-                  </div>
-                  {auth.isAdmin ? (
-                    <Link to="/admin" className="flex items-center gap-3 p-3 rounded-xl hover:bg-emerald-50 text-emerald-700 font-bold bg-emerald-50/50 mb-2">
-                      <Settings size={18}/> Admin Dashboard
-                    </Link>
-                  ) : (
-                    <Link to="/orders" className="flex items-center gap-3 p-3 rounded-xl hover:bg-emerald-50 text-emerald-700 font-bold bg-emerald-50/50 mb-2">
-                      <Package size={18}/> My Orders
-                    </Link>
-                  )}
-                  <button onClick={() => auth.signOut()} className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-red-50 text-red-600 font-medium transition-colors">
-                    <LogOut size={18}/> Sign Out
-                  </button>
-                </>
+            {/* Desktop Links */}
+            <div className="hidden md:flex items-center gap-8">
+              <button onClick={scrollToTop} className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors">Home</button>
+              
+              <button onClick={() => scrollToSection('shop')} className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors">Shop</button>
+              
+              <button onClick={() => scrollToSection('labs')} className="text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors">Technology</button>
+              
+              {user ? (
+                 <div className="flex items-center gap-4">
+                    <Link to="/orders" className="text-sm font-bold text-slate-900 hover:text-emerald-600">My Orders</Link>
+                    {user.email === 'vinaycollege1531@gmail.com' && (
+                      <Link to="/admin" className="text-sm font-bold text-purple-600 hover:text-purple-700 bg-purple-50 px-3 py-1 rounded-full">Admin</Link>
+                    )}
+                    <button onClick={signOut} className="text-sm font-medium text-red-500 hover:text-red-600">Logout</button>
+                 </div>
               ) : (
-                <button onClick={onAuthClick} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold flex justify-center items-center gap-2">
-                  <User size={18} /> Login / Sign Up
+                <button onClick={() => setIsAuthOpen(true)} className="flex items-center gap-2 text-sm font-bold text-slate-900 hover:text-emerald-600">
+                  <User size={18}/> Login
                 </button>
               )}
+
+              {/* Cart Button */}
+              <button 
+                onClick={handleCartClick}
+                className="relative p-3 bg-slate-50 rounded-full hover:bg-emerald-50 text-slate-900 hover:text-emerald-600 transition-all hover:scale-105"
+              >
+                <ShoppingBag size={20} />
+                {cartContext && cartContext.cartCount > 0 && (
+                  <span className="absolute top-0 right-0 w-5 h-5 bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white shadow-sm">
+                    {cartContext.cartCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Mobile Menu Button */}
+            <div className="md:hidden flex items-center gap-4">
+               <button onClick={handleCartClick} className="relative p-2 text-slate-900">
+                <ShoppingBag size={24} />
+                {cartContext && cartContext.cartCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-emerald-600 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                    {cartContext.cartCount}
+                  </span>
+                )}
+              </button>
+              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-slate-900">
+                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
             </div>
           </div>
         </div>
-      )}
-    </nav>
+
+        {/* Mobile Menu */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-white border-t border-slate-100 p-4 space-y-4 animate-in slide-in-from-top-5">
+            <button onClick={scrollToTop} className="block py-2 text-slate-600 font-medium w-full text-left">Home</button>
+            <button onClick={() => scrollToSection('shop')} className="block py-2 text-slate-600 font-medium w-full text-left">Shop</button>
+            <button onClick={() => scrollToSection('labs')} className="block py-2 text-slate-600 font-medium w-full text-left">Technology</button>
+            {user ? (
+               <>
+                 <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-slate-900 font-bold">My Orders</Link>
+                 <button onClick={()=>{signOut(); setIsMenuOpen(false)}} className="block py-2 text-red-500 font-medium w-full text-left">Logout</button>
+               </>
+            ) : (
+               <button onClick={()=>{setIsAuthOpen(true); setIsMenuOpen(false)}} className="block py-2 text-emerald-600 font-bold w-full text-left">Login / Signup</button>
+            )}
+          </div>
+        )}
+      </nav>
+
+      <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
+      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
+    </>
   );
 };

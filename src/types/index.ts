@@ -8,32 +8,28 @@ export enum FarmingMethod {
   AEROPONIC = 'Aeroponic',
 }
 
-export interface ProductVariant {
-  id: string;
-  weight: string;
-  price: number;
-  stock: number;
-}
+export type ProductStatus = 'active' | 'hidden' | 'coming_soon';
 
 export interface Product {
   id: string;
   name: string;
   description: string;
   category: Category;
-  farmingMethod: FarmingMethod;
+  farming_method: FarmingMethod;
   images: string[];
-  basePrice: number;
-  isLaunchingSoon: boolean;
+  price: number;        // Moved from variant
+  stock: number;        // Moved from variant
+  weight: string;       // Moved from variant
+  status: ProductStatus; // New control field
+  is_deleted: boolean;   // New soft-delete field
   rating: number;
-  reviewsCount: number;
-  discountPercentage?: number;
-  variants: ProductVariant[];
+  reviews_count: number;
+  discount_percentage?: number;
 }
 
 export interface CartItem {
   id: string;
   productId: string;
-  variantId: string;
   quantity: number;
   product: Product;
 }

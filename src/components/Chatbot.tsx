@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
-import { MessageSquare, Leaf, X, ArrowRight } from 'lucide-react';
+import { MessageSquare, Leaf, X, ArrowRight, Phone } from 'lucide-react';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export const Chatbot: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showOptions, setShowOptions] = useState(false); // Controls the 2-option menu
+  
   const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([
     { role: 'bot', text: 'Namaste! I am the Supr Organic assistant. Ask me about our fresh mushrooms or upcoming aeroponic saffron!' }
   ]);
@@ -35,9 +37,54 @@ export const Chatbot: React.FC = () => {
     }
   };
 
+  const handleMainClick = () => {
+    if (isOpen) {
+      setIsOpen(false);
+    } else {
+      setShowOptions(!showOptions);
+    }
+  };
+
+  const openWhatsapp = () => {
+    window.open('https://wa.me/918826986127', '_blank');
+    setShowOptions(false);
+  };
+
+  const openAIChat = () => {
+    setIsOpen(true);
+    setShowOptions(false);
+  };
+
   return (
-    <div className="fixed bottom-6 right-6 z-[100]">
-      {isOpen ? (
+    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
+      
+      {/* 2-Option Menu Popup */}
+      {showOptions && !isOpen && (
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden mb-2 animate-in slide-in-from-bottom-2 fade-in duration-200">
+          <button onClick={openAIChat} className="flex items-center gap-3 w-full px-6 py-4 hover:bg-slate-50 transition-colors border-b border-slate-100 text-left">
+            <div className="bg-emerald-100 text-emerald-600 p-2 rounded-full">
+              <Leaf size={18} />
+            </div>
+            <div>
+              <p className="font-bold text-slate-800 text-sm">AI Assistant</p>
+              <p className="text-xs text-slate-500">Ask about products</p>
+            </div>
+          </button>
+          
+          <button onClick={openWhatsapp} className="flex items-center gap-3 w-full px-6 py-4 hover:bg-slate-50 transition-colors text-left">
+            <div className="bg-green-100 text-green-600 p-2 rounded-full">
+              <Phone size={18} />
+            </div>
+            <div>
+              <p className="font-bold text-slate-800 text-sm">WhatsApp</p>
+              <p className="text-xs text-slate-500">+91 8826986127</p>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Main AI Chat Window */}
+      {isOpen && (
         <div className="bg-white w-80 sm:w-96 h-[500px] rounded-3xl shadow-2xl flex flex-col border border-slate-100 animate-in slide-in-from-bottom-5">
            <div className="p-4 bg-emerald-600 rounded-t-3xl text-white flex justify-between items-center">
              <div className="flex items-center gap-2">
@@ -61,9 +108,20 @@ export const Chatbot: React.FC = () => {
              </form>
            </div>
         </div>
-      ) : (
-        <button onClick={() => setIsOpen(true)} className="bg-slate-900 text-white p-4 rounded-full shadow-2xl hover:bg-emerald-600 transition-all hover:scale-110"><MessageSquare /></button>
       )}
+
+      {/* Floating Action Button */}
+      <button 
+        onClick={handleMainClick} 
+        className={`p-4 rounded-full shadow-2xl transition-all hover:scale-110 ${isOpen || showOptions ? 'bg-slate-800 rotate-45' : 'bg-slate-900'} text-white`}
+      >
+        {isOpen ? <Plus className="rotate-45" size={24} /> : <MessageSquare size={24} />}
+      </button>
     </div>
   );
 };
+
+// Helper Icon for the FAB
+const Plus = ({size, className}: {size:number, className?:string}) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+)
