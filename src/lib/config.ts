@@ -1,0 +1,1 @@
+export const ADMIN_EMAIL = 'vinaycollege1531@gmail.com';

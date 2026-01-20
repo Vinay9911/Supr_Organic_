@@ -1,22 +1,11 @@
-
 export enum Category {
-  SAFFRON = 'Saffron',
   MUSHROOMS = 'Mushrooms',
-  MICROGREENS = 'Microgreens',
+  SAFFRON = 'Saffron',
 }
 
 export enum FarmingMethod {
+  MODERN = 'Modern Farming',
   AEROPONIC = 'Aeroponic',
-  MODERN_FARMING = 'Modern Farming',
-  HYDROPONIC = 'Hydroponic',
-}
-
-export enum OrderStatus {
-  PENDING = 'Pending',
-  PROCESSING = 'Processing',
-  SHIPPED = 'Shipped',
-  DELIVERED = 'Delivered',
-  CANCELLED = 'Cancelled',
 }
 
 export interface ProductVariant {
@@ -34,11 +23,11 @@ export interface Product {
   farmingMethod: FarmingMethod;
   images: string[];
   basePrice: number;
-  variants: ProductVariant[];
   isLaunchingSoon: boolean;
   rating: number;
   reviewsCount: number;
   discountPercentage?: number;
+  variants: ProductVariant[];
 }
 
 export interface CartItem {
@@ -49,21 +38,8 @@ export interface CartItem {
   product: Product;
 }
 
-export interface Order {
+export interface AuthUser {
   id: string;
-  userId: string;
-  items: CartItem[];
-  totalAmount: number;
-  status: OrderStatus;
-  createdAt: string;
-  shippingAddress: string;
-  paymentMethod: string;
-}
-
-export interface UserProfile {
-  id: string;
-  email: string;
-  fullName: string;
-  phone?: string;
-  addresses: string[];
+  email?: string;
+  full_name?: string;
 }
