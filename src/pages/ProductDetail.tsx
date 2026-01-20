@@ -1,8 +1,9 @@
 import React, { useContext, useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Star, Truck, ShieldCheck, Leaf, Plus, Minus, ArrowLeft } from 'lucide-react';
+import { Star, Truck, ShieldCheck, Leaf, Plus, Minus, ArrowLeft, Heart } from 'lucide-react';
 import { DataContext } from '../context/DataContext';
 import { CartContext } from '../context/CartContext';
+import { WishlistContext } from '../context/WishlistContext'; // New Import
 import { SEO } from '../components/SEO';
 import toast from 'react-hot-toast';
 
@@ -10,6 +11,8 @@ export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { products, loading } = useContext(DataContext)!;
   const cartContext = useContext(CartContext);
+  const wishlistCtx = useContext(WishlistContext); // Use Wishlist Context
+  
   const [qty, setQty] = useState(1);
   const [selectedVariantId, setSelectedVariantId] = useState<string>('');
   const [activeImage, setActiveImage] = useState(0);
@@ -32,6 +35,16 @@ export const ProductDetail: React.FC = () => {
     if (selectedVariant) {
       cartContext?.addToCart(product, selectedVariant.id, qty);
       toast.success('Added to Cart!');
+    }
+  };
+
+  // Wishlist Logic
+  const isWishlisted = wishlistCtx?.isInWishlist(product.id) || false;
+  const toggleWishlist = () => {
+    if (isWishlisted) {
+      wishlistCtx?.removeFromWishlist(product.id);
+    } else {
+      wishlistCtx?.addToWishlist(product.id);
     }
   };
 
@@ -111,12 +124,23 @@ export const ProductDetail: React.FC = () => {
                </div>
             </div>
 
-            <button 
-              onClick={handleAddToCart}
-              className="w-full bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg hover:bg-emerald-600 transition-colors shadow-xl shadow-slate-200 flex items-center justify-center gap-2"
-            >
-              <Plus size={24} /> Add to Cart
-            </button>
+            {/* Action Buttons */}
+            <div className="flex gap-4">
+              <button 
+                onClick={handleAddToCart}
+                className="flex-1 bg-slate-900 text-white py-5 rounded-2xl font-bold text-lg hover:bg-emerald-600 transition-colors shadow-xl shadow-slate-200 flex items-center justify-center gap-2"
+              >
+                <Plus size={24} /> Add to Cart
+              </button>
+              
+              <button 
+                onClick={toggleWishlist}
+                className={`w-20 rounded-2xl border-2 flex items-center justify-center transition-all ${isWishlisted ? 'border-red-500 bg-red-50 text-red-500' : 'border-slate-200 text-slate-400 hover:border-red-400 hover:text-red-400'}`}
+                title={isWishlisted ? "Remove from Wishlist" : "Add to Wishlist"}
+              >
+                <Heart size={28} fill={isWishlisted ? "currentColor" : "none"} />
+              </button>
+            </div>
 
             <div className="grid grid-cols-2 gap-4 mt-8">
                <div className="flex items-center gap-3 text-sm text-slate-600 p-4 bg-slate-50 rounded-2xl"><Truck className="text-emerald-600"/> Express Delivery (Delhi)</div>

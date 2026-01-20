@@ -5,18 +5,20 @@ import { X, Minus, Plus } from 'lucide-react';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider, CartContext } from './context/CartContext';
+import { WishlistProvider } from './context/WishlistContext'; // NEW
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer'; 
 import { Chatbot } from './components/Chatbot'; 
 import { AuthModal } from './components/AuthModal'; 
 import { CheckoutModal } from './components/CheckoutModal'; 
-import { AIChef } from './pages/AIChef';
 
 // Pages
 import { Home } from './pages/Home';
 import { ProductDetail } from './pages/ProductDetail';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserOrders } from './pages/UserOrders';
+import { AIChef } from './pages/AIChef';
+import { Wishlist } from './pages/Wishlist'; // NEW
 
 const AppContent: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -28,7 +30,6 @@ const AppContent: React.FC = () => {
   const cartCtx = useContext(CartContext);
   const location = useLocation();
 
-  // Close menu on route change
   React.useEffect(() => { setIsMenuOpen(false); }, [location]);
 
   const handleCheckoutClick = () => {
@@ -55,7 +56,7 @@ const AppContent: React.FC = () => {
           <Route path="/" element={<Home />} />
           <Route path="/product/:id" element={<ProductDetail />} />
           <Route path="/orders" element={<UserOrders />} />
-          {/* Protected Admin Route */}
+          <Route path="/wishlist" element={<Wishlist />} /> 
           <Route path="/chef" element={<AIChef />} />
           <Route path="/admin" element={auth?.isAdmin ? <AdminDashboard /> : <Home />} />
         </Routes>
@@ -64,7 +65,7 @@ const AppContent: React.FC = () => {
       <Footer />
       <Chatbot />
 
-      {/* Cart Drawer */}
+      {/* Cart Drawer (Keep existing code) */}
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] overflow-hidden">
           <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsCartOpen(false)}></div>
@@ -111,9 +112,11 @@ const App: React.FC = () => {
   return (
     <AuthProvider>
       <DataProvider>
-        <CartProvider>
-          <AppContent />
-        </CartProvider>
+        <WishlistProvider>
+          <CartProvider>
+            <AppContent />
+          </CartProvider>
+        </WishlistProvider>
       </DataProvider>
     </AuthProvider>
   );

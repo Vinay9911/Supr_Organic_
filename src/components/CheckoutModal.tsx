@@ -25,15 +25,21 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
 
   if (!isOpen) return null;
 
-  const handleApplyCoupon = () => {
-    if (promoCode.toUpperCase() === 'SUPRZOOM') {
-      const discountAmount = Math.round((cartCtx?.totalPrice || 0) * 0.10);
-      setDiscount(discountAmount);
-      toast.success("Coupon Applied: 10% Off!");
-    } else {
-      toast.error("Invalid Coupon Code");
-      setDiscount(0);
-    }
+  const handleApplyCoupon = async () => {
+    if (!promoCode) return;
+    try {
+      // Dynamic Check from DB
+      const { data, error } = await supabase.from('coupons').select('*').eq('code', promoCode.toUpperCase()).eq('is_active', true).single();
+      
+      if (error || !data) {
+        toast.error("Invalid or Expired Coupon");
+        setDiscount(0);
+      } else {
+        const discountAmount = Math.round((cartCtx?.totalPrice || 0) * (data.discount_percentage / 100));
+        setDiscount(discountAmount);
+        toast.success(`Coupon Applied: ${data.discount_percentage}% Off!`);
+      }
+    } catch (err) { toast.error("Error applying coupon"); }
   };
 
   const finalTotal = (cartCtx?.totalPrice || 0) - discount;
@@ -42,25 +48,38 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     if (!auth?.user || !cartCtx) return;
     setLoading(true);
     try {
-      const { error } = await supabase.from('orders').insert({
+      // 1. Create Order
+      const { data: order, error: orderError } = await supabase.from('orders').insert({
           user_id: auth.user.id,
           total_amount: finalTotal,
           status: 'Pending',
           shipping_address: `${address} | Phone: ${phone}`,
-          payment_method: 'UPI - 8826986127@upi'
-        });
-      if (error) throw error;
+          payment_method: 'UPI'
+      }).select().single();
+
+      if (orderError) throw orderError;
+
+      // 2. Decrement Stock (Using Database Function for safety)
+      const orderItemsJson = cartCtx.cart.map(item => ({ variantId: item.variantId, quantity: item.quantity }));
+      const { error: stockError } = await supabase.rpc('decrement_stock', { order_items: orderItemsJson });
+
+      if (stockError) throw new Error("Some items are out of stock!");
+
+      // 3. Create Order Items (optional tracking)
+      // ... (Code to insert into order_items table would go here)
+
       setOrderSuccess(true);
       cartCtx.clearCart();
       toast.success("Order Placed Successfully!");
-    } catch (err) { 
-      toast.error("Failed to place order."); 
+    } catch (err: any) { 
+      toast.error(err.message || "Failed to place order."); 
     } finally { 
       setLoading(false); 
     }
   };
 
   if (orderSuccess) return (
+    // ... (Keep existing Success UI)
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
       <div className="relative bg-white rounded-3xl w-full max-w-md p-8 text-center animate-in zoom-in-95 shadow-2xl">
@@ -76,7 +95,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
+       {/* ... (Keep existing Layout, only changes in logic above) */}
+       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl w-full max-w-lg p-8 shadow-2xl animate-in slide-in-from-bottom-10 overflow-hidden">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-serif font-bold text-slate-900">Checkout</h2>
@@ -102,7 +122,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                <div className="relative flex-1">
                  <Tag size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                  <input 
-                   placeholder="Promo Code (Try SUPRZOOM)" 
+                   placeholder="Promo Code" 
                    value={promoCode} 
                    onChange={e => setPromoCode(e.target.value)}
                    disabled={discount > 0}
@@ -116,15 +136,9 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
              <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-2">
                <div className="flex justify-between text-slate-500 text-sm"><span>Subtotal</span><span>₹{cartCtx?.totalPrice}</span></div>
                {discount > 0 && (
-                 <div className="flex justify-between text-emerald-600 font-bold text-sm"><span>Discount (10%)</span><span>- ₹{discount}</span></div>
+                 <div className="flex justify-between text-emerald-600 font-bold text-sm"><span>Discount</span><span>- ₹{discount}</span></div>
                )}
                <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-lg text-slate-900"><span>Total to Pay</span><span>₹{finalTotal}</span></div>
-             </div>
-
-             {/* Payment info */}
-             <div className="bg-emerald-50 p-4 rounded-xl text-center border border-emerald-100">
-               <p className="text-xs font-bold text-emerald-600 uppercase mb-2">Scan & Pay via UPI</p>
-               <div className="bg-white p-2 rounded-lg border border-emerald-100 font-mono font-bold select-all inline-block px-4">8826986127@upi</div>
              </div>
 
              <div className="flex gap-4">

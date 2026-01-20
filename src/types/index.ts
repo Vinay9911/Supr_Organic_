@@ -43,3 +43,15 @@ export interface AuthUser {
   email?: string;
   full_name?: string;
 }
+
+export interface WishlistItem {
+  id: string;
+  product: Product;
+}
+
+export interface Coupon {
+  id: string;
+  code: string;
+  discount_percentage: number;
+  is_active: boolean;
+}

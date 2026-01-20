@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingCart, User, Menu, X, LogOut, Settings, Package, Sparkles, Leaf } from 'lucide-react';
+import { ShoppingCart, User, Menu, X, LogOut, Settings, Package, Sparkles, Leaf, Heart } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 
@@ -55,7 +55,17 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, onCartClick, onAuth
           </div>
 
           {/* Right Side Icons */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            
+            {/* Wishlist Button (New) */}
+            <Link 
+              to="/wishlist" 
+              className={`p-2 transition-colors ${isActive('/wishlist') ? 'text-red-500' : 'text-slate-600 hover:text-red-500'}`}
+              title="My Wishlist"
+            >
+              <Heart size={22} fill={isActive('/wishlist') ? "currentColor" : "none"} />
+            </Link>
+
             {/* Cart Button */}
             <button onClick={onCartClick} className="p-2 text-slate-600 hover:text-emerald-600 relative transition-colors">
               <ShoppingCart size={22} />
@@ -125,9 +135,9 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, onCartClick, onAuth
             <Link to="/chef" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
               <Sparkles size={18} className="text-amber-500"/> AI Chef
             </Link>
-            <div className="flex items-center gap-3 p-3 rounded-xl text-slate-400 font-medium cursor-not-allowed">
-              <div className="w-4 h-4 rounded-full border-2 border-slate-300"></div> Saffron (Soon)
-            </div>
+            <Link to="/wishlist" className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 text-slate-700 font-medium">
+              <Heart size={18} className="text-red-500"/> My Wishlist
+            </Link>
             
             <div className="border-t border-slate-100 my-4 pt-4">
               {auth?.user ? (
