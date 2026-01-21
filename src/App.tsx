@@ -5,7 +5,7 @@ import { X, Minus, Plus } from 'lucide-react';
 import { AuthProvider, AuthContext } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { CartProvider, CartContext } from './context/CartContext';
-import { WishlistProvider } from './context/WishlistContext'; // NEW
+import { WishlistProvider } from './context/WishlistContext';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer'; 
 import { Chatbot } from './components/Chatbot'; 
@@ -18,7 +18,7 @@ import { ProductDetail } from './pages/ProductDetail';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { UserOrders } from './pages/UserOrders';
 import { AIChef } from './pages/AIChef';
-import { Wishlist } from './pages/Wishlist'; // NEW
+import { Wishlist } from './pages/Wishlist';
 
 const AppContent: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -39,7 +39,7 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-white font-sans text-slate-900">
+    <div className="min-h-screen flex flex-col bg-brand-light font-sans text-brand-text">
       <Toaster position="top-center" toastOptions={{ duration: 3000 }} />
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
       <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
@@ -65,37 +65,37 @@ const AppContent: React.FC = () => {
       <Footer />
       <Chatbot />
 
-      {/* Cart Drawer (Keep existing code) */}
+      {/* Cart Drawer */}
       {isCartOpen && (
         <div className="fixed inset-0 z-[100] overflow-hidden">
-          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setIsCartOpen(false)}></div>
+          <div className="absolute inset-0 bg-brand-dark/40 backdrop-blur-sm transition-opacity" onClick={() => setIsCartOpen(false)}></div>
           <div className="absolute inset-y-0 right-0 max-w-full flex pl-10">
             <div className="w-screen max-w-md bg-white shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
                <div className="flex-1 py-6 px-4 overflow-y-auto">
                  <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-serif font-bold">Your Cart</h2>
-                    <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-slate-100 rounded-full"><X size={20}/></button>
+                    <h2 className="text-xl font-serif font-bold text-brand-text">Your Cart</h2>
+                    <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-brand-light rounded-full"><X size={20}/></button>
                  </div>
-                 {cartCtx?.cart.length === 0 ? <div className="text-center py-20 text-slate-400">Your cart is empty</div> : (
+                 {cartCtx?.cart.length === 0 ? <div className="text-center py-20 text-brand-muted">Your cart is empty</div> : (
                    <div className="space-y-6">
                      {cartCtx?.cart.map(item => (
-                       <div key={item.variantId} className="flex gap-4 py-4 border-b border-slate-50">
+                       <div key={item.productId} className="flex gap-4 py-4 border-b border-brand-cream">
                          <img src={item.product.images[0]} alt={item.product.name} className="w-16 h-16 rounded-lg object-cover" />
                          <div className="flex-1">
-                           <h4 className="font-bold text-sm">{item.product.name}</h4>
-                           <p className="text-xs text-slate-500 mb-2">{item.product.variants.find(v=>v.id===item.variantId)?.weight}</p>
+                           <h4 className="font-bold text-sm text-brand-text">{item.product.name}</h4>
+                           <p className="text-xs text-brand-muted mb-2">{item.product.weight}</p>
                            <div className="flex items-center gap-3">
-                              <button onClick={()=>cartCtx.updateQuantity(item.variantId, -1)} className="p-1 bg-slate-100 rounded hover:bg-slate-200"><Minus size={12}/></button>
+                              <button onClick={()=>cartCtx.updateQuantity(item.productId, item.quantity - 1)} className="p-1 bg-brand-light rounded hover:bg-brand-cream"><Minus size={12}/></button>
                               <span className="text-sm font-bold w-4 text-center">{item.quantity}</span>
-                              <button onClick={()=>cartCtx.updateQuantity(item.variantId, 1)} className="p-1 bg-slate-100 rounded hover:bg-slate-200"><Plus size={12}/></button>
+                              <button onClick={()=>cartCtx.updateQuantity(item.productId, item.quantity + 1)} className="p-1 bg-brand-light rounded hover:bg-brand-cream"><Plus size={12}/></button>
                            </div>
                          </div>
-                         <div className="font-bold text-sm">₹{(item.product.variants.find(v=>v.id===item.variantId)?.price || 0) * item.quantity}</div>
+                         <div className="font-bold text-sm text-brand-brown">₹{item.product.price * item.quantity}</div>
                        </div>
                      ))}
                      <div className="pt-4">
-                       <div className="flex justify-between font-bold text-lg mb-6"><span>Total</span><span>₹{cartCtx?.totalPrice}</span></div>
-                       <button onClick={handleCheckoutClick} className="w-full bg-emerald-600 text-white py-4 rounded-xl font-bold hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Proceed to Checkout</button>
+                       <div className="flex justify-between font-bold text-lg mb-6"><span>Total</span><span>₹{cartCtx?.total}</span></div>
+                       <button onClick={handleCheckoutClick} className="w-full bg-brand-brown text-white py-4 rounded-xl font-bold hover:bg-brand-dark transition-colors shadow-lg shadow-brand-brown/20">Proceed to Checkout</button>
                      </div>
                    </div>
                  )}
