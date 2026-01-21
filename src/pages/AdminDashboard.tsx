@@ -32,7 +32,6 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   const fetchOrders = async () => {
-    // UPDATED: Fetch orders AND their items
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -67,8 +66,6 @@ export const AdminDashboard: React.FC = () => {
     }
   };
 
-  // ... (Product Logic kept same as previous, omitted for brevity but include full file) ...
-  // Re-adding Product Logic for completeness of the file:
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
@@ -227,7 +224,6 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* ... Products and Coupons tabs from previous turn (handleSaveProduct logic included above) ... */}
         {activeTab === 'products' && (
           <div className="grid lg:grid-cols-3 gap-8">
             <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border h-fit sticky top-24">

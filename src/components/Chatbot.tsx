@@ -7,7 +7,7 @@ export const Chatbot: React.FC = () => {
   const [showOptions, setShowOptions] = useState(false);
   
   const [messages, setMessages] = useState<{ role: 'user' | 'bot'; text: string }[]>([
-    { role: 'bot', text: 'Namaste! I am the Supr Mashroom assistant. Ask me about our fresh mushrooms!' }
+    { role: 'bot', text: 'Namaste! I am the Supr Mushrooms assistant. Ask me about our fresh mushrooms!' }
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -27,7 +27,7 @@ export const Chatbot: React.FC = () => {
     try {
       const genAI = new GoogleGenerativeAI(API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-      const prompt = `You are the Supr Mashroom assistant. Products: Mushrooms (Oyster, Shiitake, Lion's Mane) & Saffron. Delivery: Delhi NCR (2 hours). Payment: UPI. User: ${userMsg}. Keep it short.`;
+      const prompt = `You are the Supr Mushrooms assistant. Products: Mushrooms (Oyster, Shiitake, Lion's Mane) & Saffron. Delivery: Delhi NCR (2 hours). Payment: UPI. User: ${userMsg}. Keep it short.`;
       const result = await model.generateContent(prompt);
       setMessages(prev => [...prev, { role: 'bot', text: result.response.text() }]);
     } catch (error) {

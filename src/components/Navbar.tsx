@@ -53,7 +53,7 @@ export const Navbar: React.FC = () => {
               <div className="w-10 h-10 bg-brand-brown rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-brand-brown/20 group-hover:bg-brand-dark transition-colors">
                 SM
               </div>
-              <span className="text-2xl font-serif font-bold text-brand-text tracking-tight">Supr Mashroom</span>
+              <span className="text-2xl font-serif font-bold text-brand-text tracking-tight">Supr Mushrooms</span>
             </button>
 
             {/* Desktop Links */}

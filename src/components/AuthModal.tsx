@@ -32,7 +32,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-brand-dark/60 backdrop-blur-sm" onClick={onClose}></div>
       <div className="relative bg-white rounded-3xl w-full max-w-md p-8 shadow-2xl animate-in zoom-in-95">
-        <h2 className="text-2xl font-serif font-bold text-brand-text mb-2">{isLogin ? 'Welcome Back' : 'Join Supr Mashroom'}</h2>
+        <h2 className="text-2xl font-serif font-bold text-brand-text mb-2">{isLogin ? 'Welcome Back' : 'Join Supr Mushrooms'}</h2>
         <form onSubmit={handleSubmit} className="space-y-4 mt-6">
           {!isLogin && <input type="text" placeholder="Full Name" required value={name} onChange={e => setName(e.target.value)} className="w-full bg-brand-light border border-brand-cream rounded-xl px-4 py-3 text-sm outline-none focus:border-brand-brown" />}
           <input type="email" placeholder="Email" required value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-brand-light border border-brand-cream rounded-xl px-4 py-3 text-sm outline-none focus:border-brand-brown" />
