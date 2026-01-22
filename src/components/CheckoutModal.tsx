@@ -1,8 +1,9 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { X, ArrowRight, Loader2, CreditCard, Banknote, Tag, Upload, Copy, Check } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
+import { Coupon } from '../types';
 
 interface CheckoutModalProps {
   isOpen: boolean;
@@ -16,8 +17,6 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   // Form Data
   const [formData, setFormData] = useState({ name: '', address: '', phone: '', email: '' });
   const [paymentMethod, setPaymentMethod] = useState<'COD' | 'UPI'>('COD');
-  
-  // UPI State
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
   const [copied, setCopied] = useState(false);
   
@@ -25,37 +24,35 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
   const [couponCode, setCouponCode] = useState('');
   const [discount, setDiscount] = useState(0);
   const [appliedCoupon, setAppliedCoupon] = useState<string | null>(null);
+  const [availableCoupons, setAvailableCoupons] = useState<Coupon[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      // 1. Fetch user data (if logged in) for auto-fill
+      const fetchUser = async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+           setFormData(prev => ({ ...prev, email: user.email || '' }));
+           // You can fetch profile here if needed
+        }
+      };
+      fetchUser();
+
+      // 2. Fetch Active Coupons
+      const fetchCoupons = async () => {
+        const { data } = await supabase
+          .from('coupons')
+          .select('*')
+          .eq('is_active', true);
+        if (data) setAvailableCoupons(data);
+      };
+      fetchCoupons();
+    }
+  }, [isOpen]);
 
   if (!isOpen || !cartContext) return null;
 
-  const handleApplyCoupon = async () => {
-    if (!couponCode) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('coupons')
-        .select('*')
-        .eq('code', couponCode.toUpperCase())
-        .eq('is_active', true)
-        .single();
-
-      if (error || !data) {
-        toast.error("Invalid or expired coupon");
-        setDiscount(0);
-        setAppliedCoupon(null);
-      } else {
-        const discountAmount = Math.round((cartContext.total * data.discount_percentage) / 100);
-        setDiscount(discountAmount);
-        setAppliedCoupon(data.code);
-        toast.success(`Coupon applied! You saved ₹${discountAmount}`);
-      }
-    } catch (e) {
-      toast.error("Could not apply coupon");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // --- HELPER FUNCTIONS ---
   const copyToClipboard = () => {
     navigator.clipboard.writeText("8826986127@kotak");
     setCopied(true);
@@ -69,11 +66,53 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     }
   };
 
+  const validateCoupon = (coupon: Coupon) => {
+    if (coupon.min_order_value && cartContext.total < coupon.min_order_value) {
+      toast.error(`Order needs to be at least ₹${coupon.min_order_value} to use this coupon`);
+      return false;
+    }
+    return true;
+  };
+
+  const applyCouponLogic = (coupon: Coupon) => {
+    if (!validateCoupon(coupon)) return;
+
+    let discountAmount = Math.round((cartContext.total * coupon.discount_percentage) / 100);
+    
+    if (coupon.max_discount_amount && discountAmount > coupon.max_discount_amount) {
+      discountAmount = coupon.max_discount_amount;
+    }
+
+    setDiscount(discountAmount);
+    setAppliedCoupon(coupon.code);
+    setCouponCode(coupon.code);
+    toast.success(`Coupon ${coupon.code} applied! Saved ₹${discountAmount}`);
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode) return;
+    setLoading(true);
+    
+    // Check local list first
+    const coupon = availableCoupons.find(c => c.code === couponCode.toUpperCase());
+    
+    if (coupon) {
+      applyCouponLogic(coupon);
+    } else {
+      // Fallback: Check DB if not in list (hidden coupons)
+      const { data } = await supabase.from('coupons').select('*').eq('code', couponCode.toUpperCase()).single();
+      if (data && data.is_active) {
+         applyCouponLogic(data);
+      } else {
+         toast.error("Invalid or expired coupon");
+      }
+    }
+    setLoading(false);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (cartContext.cart.length === 0) return;
-    
-    // Validation
     if (paymentMethod === 'UPI' && !paymentFile) {
       toast.error("Please upload the payment screenshot");
       return;
@@ -82,18 +121,19 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setLoading(true);
 
     try {
-      // 1. Double-Check Stock Validation
+      // 1. Stock Validation
       const isStockValid = await cartContext.validateStock();
       if (!isStockValid) {
         setLoading(false);
         return; 
       }
 
-      const userRes = await supabase.auth.getUser();
-      const userId = userRes.data.user?.id;
+      // 2. Determine User (Guest vs Logged In)
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id || null;
       const finalAmount = cartContext.total - discount;
 
-      // 2. Upload Screenshot (if UPI)
+      // 3. Upload Screenshot (if UPI)
       let paymentProofUrl = null;
       if (paymentMethod === 'UPI' && paymentFile) {
         const fileName = `${Date.now()}_${paymentFile.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
@@ -110,11 +150,12 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         paymentProofUrl = publicUrlData.publicUrl;
       }
 
-      // 3. Create Order
+      // 4. Create Order
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: userId || null, 
+          user_id: userId,
+          guest_email: !userId ? formData.email : null, // Store email for guests
           total_amount: finalAmount,
           status: 'Pending',
           shipping_address: `${formData.name}, ${formData.address}, Ph: ${formData.phone}, Email: ${formData.email}`,
@@ -128,35 +169,37 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
 
       if (orderError) throw orderError;
 
-      // 4. Create Order Items (WITH SNAPSHOT)
+      // 5. Create Order Items
       for (const item of cartContext.cart) {
         await supabase.from('order_items').insert({
           order_id: orderData.id,
           product_id: item.productId,
           quantity: item.quantity,
           price_at_order: item.product.price,
-          product_name_snapshot: item.product.name // <--- SNAPSHOT FIX
+          product_name_snapshot: item.product.name
         });
 
-        // Deduct Stock
-        const { error: stockError } = await supabase.rpc('decrement_stock', { 
-          row_id: item.productId, 
-          quantity: item.quantity 
-        });
-        
-        if (stockError) {
-           // Fallback if RPC fails
-           const newStock = item.product.stock - item.quantity;
-           await supabase.from('products').update({ stock: newStock }).eq('id', item.productId);
+        // Deduct Stock (ONLY if NOT Pre-Order)
+        if (!item.isPreOrder) {
+          const { error: stockError } = await supabase.rpc('decrement_stock', { 
+            row_id: item.productId, 
+            quantity: item.quantity 
+          });
+          
+          if (stockError) {
+             // Fallback
+             const newStock = item.product.stock - item.quantity;
+             await supabase.from('products').update({ stock: newStock }).eq('id', item.productId);
+          }
         }
       }
       
-      // 5. Update Coupon
+      // 6. Update Coupon Usage
       if (appliedCoupon) {
         await supabase.rpc('increment_coupon_usage', { coupon_code: appliedCoupon });
       }
 
-      toast.success('Order placed successfully! Confirmation email sent.');
+      toast.success('Order placed successfully! Check your email.');
       cartContext.clearCart();
       onClose();
       
@@ -194,20 +237,23 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                 <div key={item.productId} className="flex gap-3 bg-brand-light p-2 rounded-xl border border-brand-cream">
                   <img src={item.product.images[0]} className="w-16 h-16 rounded-lg object-cover bg-white" />
                   <div className="flex-1 flex flex-col justify-between">
-                    <p className="font-bold text-sm text-brand-text line-clamp-1">{item.product.name}</p>
-                    <div className="flex items-center gap-3">
-                       <span className="text-xs text-brand-muted">Qty: {item.quantity}</span>
+                    <div>
+                      <p className="font-bold text-sm text-brand-text line-clamp-1">{item.product.name}</p>
+                      {item.isPreOrder && (
+                        <span className="text-[10px] bg-slate-800 text-white px-1.5 py-0.5 rounded font-bold">PRE-ORDER</span>
+                      )}
                     </div>
+                    <span className="text-xs text-brand-muted">Qty: {item.quantity}</span>
                   </div>
                   <div className="font-bold text-sm flex items-end pb-1 text-brand-brown">₹{item.product.price * item.quantity}</div>
                 </div>
               ))}
             </div>
             
-            {/* Coupon */}
+            {/* Coupon Section */}
             <div className="mt-6 pt-4 border-t border-brand-cream">
               <label className="text-xs font-bold text-brand-muted uppercase tracking-wider mb-2 block">Apply Coupon</label>
-              <div className="flex gap-2">
+              <div className="flex gap-2 mb-2">
                 <div className="relative flex-1">
                   <Tag className="absolute left-3 top-3 text-brand-muted" size={16}/>
                   <input 
@@ -224,6 +270,22 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
                   <button onClick={handleApplyCoupon} className="bg-brand-text text-white px-4 rounded-xl text-sm font-bold">Apply</button>
                 )}
               </div>
+
+              {/* Available Coupons Pills */}
+              {availableCoupons.length > 0 && !appliedCoupon && (
+                <div className="flex flex-wrap gap-2">
+                  {availableCoupons.map(c => (
+                    <button 
+                      key={c.id} 
+                      type="button"
+                      onClick={() => applyCouponLogic(c)}
+                      className="text-[10px] bg-green-50 text-green-700 border border-green-200 px-2 py-1 rounded-lg hover:bg-green-100 flex items-center gap-1 transition-colors"
+                    >
+                      <Tag size={10}/> <b>{c.code}</b> ({c.discount_percentage}% OFF)
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="mt-4 space-y-2">
@@ -235,9 +297,15 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
 
           {/* Right Column: Form */}
           <form id="checkout-form" onSubmit={handleSubmit} className="space-y-4">
-            <h3 className="font-bold text-brand-muted text-xs uppercase tracking-wider mb-4">Shipping Details</h3>
+            <div className="flex items-center justify-between">
+               <h3 className="font-bold text-brand-muted text-xs uppercase tracking-wider">Shipping Details</h3>
+               <span className="text-[10px] bg-brand-light px-2 py-1 rounded border border-brand-cream text-brand-muted">
+                 {formData.email && !cartContext.isLoading ? 'Verified' : 'Guest Checkout'}
+               </span>
+            </div>
+            
             <input required placeholder="Full Name" value={formData.name} onChange={e=>setFormData({...formData, name: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl outline-none focus:border-brand-brown"/>
-            <input required type="email" placeholder="Email Address" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl outline-none focus:border-brand-brown"/>
+            <input required type="email" placeholder="Email Address (Required for tracking)" value={formData.email} onChange={e=>setFormData({...formData, email: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl outline-none focus:border-brand-brown"/>
             <input required placeholder="Phone Number" value={formData.phone} onChange={e=>setFormData({...formData, phone: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl outline-none focus:border-brand-brown"/>
             <textarea required placeholder="Full Address" value={formData.address} onChange={e=>setFormData({...formData, address: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl outline-none focus:border-brand-brown h-20"/>
             

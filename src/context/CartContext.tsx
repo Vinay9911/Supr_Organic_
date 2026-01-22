@@ -1,14 +1,15 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Product, CartItem } from '../types';
 import { supabase } from '../lib/supabase';
-import { AuthContext } from './AuthContext'; // Ensure you have this context
+import { AuthContext } from './AuthContext';
 import toast from 'react-hot-toast';
 
 interface CartContextType {
   cart: CartItem[];
   isCartOpen: boolean;
+  isLoading: boolean;
   setIsCartOpen: (open: boolean) => void;
-  addToCart: (product: Product, quantity: number) => void;
+  addToCart: (product: Product, quantity: number) => Promise<void>;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
@@ -22,17 +23,19 @@ export const CartContext = createContext<CartContextType | undefined>(undefined)
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const { user } = useContext(AuthContext)!; // Start using Auth User
+  const [isLoading, setIsLoading] = useState(false);
+  const { user } = useContext(AuthContext)!;
 
-  // 1. INITIAL LOAD (Local or DB)
+  // 1. INITIAL LOAD
   useEffect(() => {
     const loadCart = async () => {
+      setIsLoading(true);
       if (user) {
         const { data } = await supabase.from('carts').select('items').eq('user_id', user.id).single();
         if (data?.items) {
           setCart(data.items);
         } else {
-          // If no DB cart, check local and sync up
+          // Sync local to DB if just logged in
           const local = localStorage.getItem('supr_cart');
           if (local) {
             const parsed = JSON.parse(local);
@@ -44,11 +47,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const savedCart = localStorage.getItem('supr_cart');
         if (savedCart) try { setCart(JSON.parse(savedCart)); } catch (e) { console.error(e); }
       }
+      setIsLoading(false);
     };
     loadCart();
   }, [user]);
 
-  // 2. PERSISTENCE (Save on Change)
+  // 2. PERSISTENCE
   useEffect(() => {
     if (user) {
       const saveToDb = async () => {
@@ -72,18 +76,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           return prev.map(item => {
             if (item.productId === updatedProduct.id) {
-               // Update price dynamically
+               // Update price/info dynamically
                const newItem = { ...item, product: { ...item.product, ...updatedProduct } };
                
-               // Auto-reduce quantity if stock drops
-               if (updatedProduct.stock < item.quantity) {
+               // Only reduce stock if it's NOT a pre-order
+               if (!item.isPreOrder && updatedProduct.stock < item.quantity) {
                   toast.error(`Stock alert: ${updatedProduct.name} only has ${updatedProduct.stock} left.`);
                   newItem.quantity = updatedProduct.stock;
                }
                return newItem;
             }
             return item;
-          }).filter(item => item.quantity > 0); // Remove if stock hits 0
+          }).filter(item => item.isPreOrder || item.quantity > 0);
         });
       })
       .subscribe();
@@ -92,17 +96,18 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const validateStock = async (): Promise<boolean> => {
+    setIsLoading(true);
     let isValid = true;
     const updatedCart = [...cart];
-    if (updatedCart.length === 0) return true;
+    if (updatedCart.length === 0) { setIsLoading(false); return true; }
 
     const productIds = cart.map(item => item.productId);
     const { data: products } = await supabase
       .from('products')
-      .select('id, stock, name, price, is_deleted')
+      .select('id, stock, name, price, is_deleted, status')
       .in('id', productIds);
 
-    if (!products) return true;
+    if (!products) { setIsLoading(false); return true; }
 
     for (let i = 0; i < updatedCart.length; i++) {
       const item = updatedCart[i];
@@ -111,18 +116,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!remoteProduct || remoteProduct.is_deleted) {
         toast.error(`${item.product.name} is no longer available.`);
         updatedCart.splice(i, 1);
-        i--;
-        isValid = false;
-        continue;
+        i--; isValid = false; continue;
       }
 
-      if (remoteProduct.stock < item.quantity) {
-        toast.error(`Stock update: Only ${remoteProduct.stock} left of ${item.product.name}.`);
-        updatedCart[i].quantity = remoteProduct.stock;
-        isValid = false;
-        if (remoteProduct.stock === 0) {
-           updatedCart.splice(i, 1);
-           i--;
+      // Check Pre-Order Status
+      if (remoteProduct.status === 'coming_soon') {
+        updatedCart[i].isPreOrder = true;
+      } else {
+        updatedCart[i].isPreOrder = false;
+        // Standard Stock Check
+        if (remoteProduct.stock < item.quantity) {
+          toast.error(`Stock update: Only ${remoteProduct.stock} left of ${item.product.name}.`);
+          updatedCart[i].quantity = remoteProduct.stock;
+          isValid = false;
+          if (remoteProduct.stock === 0) {
+             updatedCart.splice(i, 1);
+             i--;
+          }
         }
       }
       
@@ -133,31 +143,40 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
 
     if (!isValid) setCart(updatedCart);
+    setIsLoading(false);
     return isValid;
   };
 
   const addToCart = async (product: Product, quantity: number) => {
-    // Check Live Stock before adding
-    const { data: freshProd } = await supabase.from('products').select('stock').eq('id', product.id).single();
-    const actualStock = freshProd ? freshProd.stock : product.stock;
+    setIsLoading(true);
+    const isPreOrder = product.status === 'coming_soon';
 
-    const existingItem = cart.find(item => item.productId === product.id);
-    const currentQty = existingItem ? existingItem.quantity : 0;
-    
-    if (currentQty + quantity > actualStock) {
-      toast.error(`Sorry, only ${actualStock} units available right now!`);
-      return;
+    // Skip stock check for pre-orders
+    if (!isPreOrder) {
+      const { data: freshProd } = await supabase.from('products').select('stock').eq('id', product.id).single();
+      const actualStock = freshProd ? freshProd.stock : product.stock;
+      
+      const existingItem = cart.find(item => item.productId === product.id);
+      const currentQty = existingItem ? existingItem.quantity : 0;
+      
+      if (currentQty + quantity > actualStock) {
+        toast.error(`Sorry, only ${actualStock} units available right now!`);
+        setIsLoading(false);
+        return;
+      }
     }
 
     setCart(prev => {
-      const newList = existingItem
-        ? prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + quantity } : item)
-        : [...prev, { id: product.id, productId: product.id, quantity, product }];
-      return newList;
+      const existingItem = prev.find(item => item.productId === product.id);
+      if (existingItem) {
+        return prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + quantity } : item);
+      }
+      return [...prev, { id: product.id, productId: product.id, quantity, product, isPreOrder }];
     });
     
     setIsCartOpen(true);
-    toast.success('Added to Cart!');
+    setIsLoading(false);
+    toast.success(isPreOrder ? 'Pre-order added!' : 'Added to Cart!');
   };
 
   const removeFromCart = (productId: string) => {
@@ -165,14 +184,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity < 1) {
-      removeFromCart(productId);
-      return;
-    }
+    if (quantity < 1) { removeFromCart(productId); return; }
+    
     const item = cart.find(i => i.productId === productId);
     if (!item) return;
 
-    if (quantity > item.product.stock) {
+    if (!item.isPreOrder && quantity > item.product.stock) {
       toast.error(`Max stock reached (${item.product.stock})`);
       return;
     }
@@ -186,7 +203,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   return (
     <CartContext.Provider value={{ 
-      cart, isCartOpen, setIsCartOpen, addToCart, removeFromCart, updateQuantity, clearCart, validateStock, total, cartCount 
+      cart, isCartOpen, isLoading, setIsCartOpen, addToCart, removeFromCart, updateQuantity, clearCart, validateStock, total, cartCount 
     }}>
       {children}
     </CartContext.Provider>

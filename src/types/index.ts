@@ -32,6 +32,7 @@ export interface CartItem {
   productId: string;
   quantity: number;
   product: Product;
+  isPreOrder?: boolean;
 }
 
 export interface AuthUser {
@@ -50,7 +51,9 @@ export interface Coupon {
   code: string;
   discount_percentage: number;
   is_active: boolean;
-  usage_count: number; // For tracking
+  usage_count: number;
+  min_order_value?: number;
+  max_discount_amount?: number;
 }
 
 export interface OrderItem {
@@ -59,16 +62,13 @@ export interface OrderItem {
   product_id: string;
   quantity: number;
   price_at_order: number;
-  products?: {
-    name: string;
-    images: string[];
-  };
+  product_name_snapshot: string;
 }
 
-// Add this field to your Order interface
 export interface Order {
   id: string;
   user_id: string | null;
+  guest_email?: string;
   total_amount: number;
   status: 'Pending' | 'Shipped' | 'Delivered' | 'Cancelled';
   shipping_address: string;

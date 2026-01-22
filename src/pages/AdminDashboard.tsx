@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Loader2, Edit2, Save, X, Eye, Search, Square, CheckSquare, Tag, ExternalLink, AlertTriangle, Plus, Phone, MapPin, CreditCard, Trash2, Calendar, Users } from 'lucide-react';
+import { Loader2, Edit2, Save, X, Eye, Search, Square, CheckSquare, Tag, ExternalLink, AlertTriangle, Plus, Phone, MapPin, CreditCard, Trash2, Calendar, Users, Download } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { DataContext } from '../context/DataContext';
@@ -29,6 +29,7 @@ export const AdminDashboard: React.FC = () => {
   // Coupon Form
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponDiscount, setNewCouponDiscount] = useState('');
+  const [minOrderVal, setMinOrderVal] = useState('');
 
   useEffect(() => { 
     window.scrollTo(0, 0);
@@ -37,7 +38,6 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   const fetchOrders = async () => {
-    // Selecting product_name_snapshot to fix "Unknown Product" issue on deleted items
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -60,7 +60,171 @@ export const AdminDashboard: React.FC = () => {
     if (!error) setCoupons(data || []);
   };
 
-  // --- ORDER LOGIC ---
+  // --- ANALYTICS FUNCTION (RESTORED) ---
+  const getRevenueData = () => {
+    const days = 30;
+    const data = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dailySales = orders
+        .filter(o => o.created_at.startsWith(dateStr))
+        .reduce((sum, o) => sum + o.total_amount, 0);
+      data.push({ name: dateStr.slice(5), sales: dailySales });
+    }
+    return data;
+  };
+
+  // --- CSV EXPORT ---
+  const downloadOrdersCSV = () => {
+    const headers = ['Order ID', 'Date', 'Customer Name', 'Email', 'Phone', 'Address', 'Total', 'Status', 'Items'];
+    const rows = orders.map(o => {
+      const details = o.shipping_address || ''; 
+      // Handle Guest Email vs Registered User
+      const userEmail = o.guest_email || 'Registered User';
+      const userPhone = details.match(/Ph: (.*?),/)?.[1] || 'N/A';
+      
+      const items = o.order_items.map((i: any) => `${i.product_name_snapshot} (x${i.quantity})`).join('; ');
+      
+      return [
+        o.id,
+        new Date(o.created_at).toLocaleDateString(),
+        details.split(',')[0],
+        userEmail,
+        userPhone,
+        `"${details.replace(/"/g, '""')}"`, // Escape quotes
+        o.total_amount,
+        o.status,
+        `"${items.replace(/"/g, '""')}"`
+      ];
+    });
+
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + headers.join(",") + "\n" 
+      + rows.map(e => e.join(",")).join("\n");
+
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `orders_export_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // --- IMAGE COMPRESSION & UPLOAD ---
+  const compressImage = (file: File): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return reject('No canvas context');
+        
+        const MAX_WIDTH = 1200;
+        let width = img.width;
+        let height = img.height;
+        if (width > MAX_WIDTH) {
+          height *= MAX_WIDTH / width;
+          width = MAX_WIDTH;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob((blob) => {
+           if (blob) resolve(blob);
+           else reject('Compression failed');
+        }, 'image/jpeg', 0.8);
+      };
+      img.onerror = reject;
+    });
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      if (!e.target.files || e.target.files.length === 0) return;
+      
+      const newImages: string[] = [];
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i];
+        
+        // Compress before upload
+        const compressedBlob = await compressImage(file);
+        const compressedFile = new File([compressedBlob], file.name, { type: 'image/jpeg' });
+
+        const filePath = `prod_${Date.now()}_${Math.random().toString(36).substring(7)}.jpg`;
+        const { error } = await supabase.storage.from('products').upload(filePath, compressedFile);
+        if (error) throw error;
+        const { data } = supabase.storage.from('products').getPublicUrl(filePath);
+        newImages.push(data.publicUrl);
+      }
+      
+      setProductForm(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
+      toast.success(`${newImages.length} images optimized & uploaded`);
+    } catch (error: any) { toast.error("Upload failed: " + error.message); } 
+    finally { setUploading(false); }
+  };
+
+  // --- PRODUCT MANAGEMENT ---
+  const startEdit = (p: Product) => {
+    setEditingProduct(p);
+    setProductForm({ 
+        name: p.name, 
+        desc: p.description, 
+        price: p.price.toString(), 
+        stock: p.stock.toString(), 
+        weight: p.weight, 
+        images: p.images, 
+        status: p.status 
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (productForm.images.length === 0) throw new Error("At least one image is required");
+      
+      const payload = {
+        name: productForm.name,
+        description: productForm.desc,
+        price: parseFloat(productForm.price),
+        stock: parseInt(productForm.stock),
+        weight: productForm.weight,
+        images: productForm.images,
+        status: productForm.status,
+      };
+
+      if (editingProduct) {
+        await supabase.from('products').update(payload).eq('id', editingProduct.id);
+        toast.success("Product Updated");
+      } else {
+        await supabase.from('products').insert({ 
+            ...payload, 
+            farming_method: 'Modern Farming', 
+            slug: productForm.name.toLowerCase().replace(/ /g, '-'), 
+            is_deleted: false 
+        });
+        toast.success("Product Created");
+      }
+      setEditingProduct(null);
+      setProductForm({ name: '', desc: '', price: '', stock: '', weight: '', images: [], status: 'active' });
+      refreshProducts();
+    } catch (err: any) { toast.error(err.message); }
+  };
+
+  const handleSoftDelete = async (id: string) => {
+    if (!confirm("Delete this product? It will remain in past orders.")) return;
+    const { error } = await supabase.from('products').update({ is_deleted: true, status: 'hidden' }).eq('id', id);
+    if (error) toast.error("Failed"); else { toast.success("Deleted"); refreshProducts(); }
+  };
+
+  // --- ORDER MANAGEMENT ---
   const filteredOrders = orders.filter(o => {
     const matchesSearch = o.id.includes(orderSearch) || o.shipping_address?.toLowerCase().includes(orderSearch.toLowerCase());
     const matchesStatus = orderFilter === 'All' || o.status === orderFilter;
@@ -89,90 +253,6 @@ export const AdminDashboard: React.FC = () => {
     else { toast.success("Updated"); fetchOrders(); setSelectedOrders([]); }
   };
 
-  // --- PRODUCT ACTIONS (FIXED IMAGE UPLOAD) ---
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      setUploading(true);
-      if (!e.target.files || e.target.files.length === 0) return;
-      
-      const newImages: string[] = [];
-      // Loop through all selected files
-      for (let i = 0; i < e.target.files.length; i++) {
-        const file = e.target.files[i];
-        const filePath = `prod_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        const { error } = await supabase.storage.from('products').upload(filePath, file);
-        if (error) throw error;
-        const { data } = supabase.storage.from('products').getPublicUrl(filePath);
-        newImages.push(data.publicUrl);
-      }
-      
-      setProductForm(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
-      toast.success(`${newImages.length} images uploaded`);
-    } catch (error: any) { toast.error("Upload failed: " + error.message); } 
-    finally { setUploading(false); }
-  };
-
-  const removeImage = (index: number) => {
-    setProductForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
-  };
-
-  const handleSaveProduct = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (productForm.images.length === 0) throw new Error("At least one image is required");
-      
-      const payload = {
-        name: productForm.name,
-        description: productForm.desc,
-        price: parseFloat(productForm.price),
-        stock: parseInt(productForm.stock),
-        weight: productForm.weight,
-        images: productForm.images,
-        status: productForm.status,
-      };
-
-      if (editingProduct) {
-        await supabase.from('products').update(payload).eq('id', editingProduct.id);
-        toast.success("Product Updated");
-      } else {
-        await supabase.from('products').insert({ ...payload, farming_method: 'Modern Farming', slug: productForm.name.toLowerCase().replace(/ /g, '-'), is_deleted: false });
-        toast.success("Product Created");
-      }
-      setEditingProduct(null);
-      setProductForm({ name: '', desc: '', price: '', stock: '', weight: '', images: [], status: 'active' });
-      refreshProducts();
-    } catch (err: any) { toast.error(err.message); }
-  };
-
-  const handleSoftDelete = async (id: string) => {
-    if (!confirm("Delete this product? It will remain in past orders.")) return;
-    const { error } = await supabase.from('products').update({ is_deleted: true, status: 'hidden' }).eq('id', id);
-    if (error) toast.error("Failed"); else { toast.success("Deleted"); refreshProducts(); }
-  };
-
-  const startEdit = (p: Product) => {
-    setEditingProduct(p);
-    setProductForm({ name: p.name, desc: p.description, price: p.price.toString(), stock: p.stock.toString(), weight: p.weight, images: p.images, status: p.status });
-    setActiveTab('products');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  // --- ANALYTICS ---
-  const getRevenueData = () => {
-    const days = 30;
-    const data = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
-      const dailySales = orders
-        .filter(o => o.created_at.startsWith(dateStr))
-        .reduce((sum, o) => sum + o.total_amount, 0);
-      data.push({ name: dateStr.slice(5), sales: dailySales });
-    }
-    return data;
-  };
-
   return (
     <div className="min-h-screen bg-brand-light pt-24 pb-20 px-4 sm:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
@@ -191,7 +271,6 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'overview' && (
           <div className="space-y-6 animate-in fade-in">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-              {/* Stats Cards */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
                 <p className="text-xs font-bold text-brand-muted uppercase">Total Revenue</p>
                 <p className="text-3xl font-bold text-brand-brown mt-2">₹{orders.reduce((a,c) => a + c.total_amount, 0).toLocaleString()}</p>
@@ -205,10 +284,12 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-3xl font-bold text-amber-500 mt-2">{orders.filter(o=>o.status==='Pending').length}</p>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
-                <p className="text-xs font-bold text-brand-muted uppercase">Customers</p>
-                <p className="text-3xl font-bold text-blue-600 mt-2">{new Set(orders.map(o=>o.user_id).filter(Boolean)).size}</p>
+                <p className="text-xs font-bold text-brand-muted uppercase">Unique Customers</p>
+                <p className="text-3xl font-bold text-blue-600 mt-2">{new Set(orders.map(o=>o.guest_email || o.user_id).filter(Boolean)).size}</p>
               </div>
             </div>
+
+            {/* RESTORED GRAPH SECTION */}
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream h-96">
                <h3 className="font-bold text-brand-text mb-4">Sales Analytics (30 Days)</h3>
                <ResponsiveContainer width="100%" height="100%">
@@ -229,7 +310,7 @@ export const AdminDashboard: React.FC = () => {
                <div className="flex flex-col sm:flex-row gap-4 flex-1">
                  <div className="relative flex-1 max-w-sm">
                    <Search className="absolute left-3 top-3 text-brand-muted" size={18}/>
-                   <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="Search ID or Address..." className="w-full pl-10 p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none focus:ring-2 focus:ring-brand-brown/50"/>
+                   <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="Search ID or Address..." className="w-full pl-10 p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none"/>
                  </div>
                  <div className="flex items-center gap-2 bg-brand-light border border-brand-cream rounded-lg px-3">
                     <Calendar size={16} className="text-brand-muted"/>
@@ -241,6 +322,9 @@ export const AdminDashboard: React.FC = () => {
                    <option value="Shipped">Shipped</option>
                    <option value="Delivered">Delivered</option>
                  </select>
+                 <button onClick={downloadOrdersCSV} className="flex items-center gap-2 px-4 py-2 bg-brand-brown text-white rounded-lg text-sm font-bold hover:bg-brand-dark transition-colors whitespace-nowrap">
+                    <Download size={16}/> Export CSV
+                 </button>
                </div>
                {selectedOrders.length > 0 && (
                  <div className="flex gap-2 items-center animate-in slide-in-from-right">
@@ -272,7 +356,9 @@ export const AdminDashboard: React.FC = () => {
                           </button>
                         </td>
                         <td className="p-4 font-mono text-brand-text">#{order.id.slice(0,8)}</td>
-                        <td className="p-4 max-w-xs truncate" title={order.shipping_address}>{order.shipping_address?.split(',')[0]}</td>
+                        <td className="p-4 max-w-xs truncate" title={order.shipping_address}>
+                            {order.guest_email ? `${order.guest_email} (Guest)` : order.shipping_address?.split(',')[0]}
+                        </td>
                         <td className="p-4 text-brand-muted">{new Date(order.created_at).toLocaleDateString()}</td>
                         <td className="p-4 font-bold text-brand-brown">₹{order.total_amount}</td>
                         <td className="p-4">
@@ -296,7 +382,7 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
 
-        {/* CUSTOMERS TAB (NEW) */}
+        {/* CUSTOMERS TAB */}
         {activeTab === 'customers' && (
           <div className="bg-white rounded-xl border border-brand-cream overflow-hidden animate-in fade-in">
              <div className="p-6 border-b border-brand-cream">
@@ -308,11 +394,12 @@ export const AdminDashboard: React.FC = () => {
                </thead>
                <tbody className="divide-y divide-brand-cream text-sm">
                  {Object.values(orders.reduce((acc: any, order) => {
-                   if(!order.user_id) return acc;
-                   if(!acc[order.user_id]) acc[order.user_id] = { id: order.user_id, count: 0, spent: 0, last: order.created_at };
-                   acc[order.user_id].count++;
-                   acc[order.user_id].spent += order.total_amount;
-                   if(new Date(order.created_at) > new Date(acc[order.user_id].last)) acc[order.user_id].last = order.created_at;
+                   const key = order.guest_email || order.user_id;
+                   if(!key) return acc;
+                   if(!acc[key]) acc[key] = { id: key, count: 0, spent: 0, last: order.created_at };
+                   acc[key].count++;
+                   acc[key].spent += order.total_amount;
+                   if(new Date(order.created_at) > new Date(acc[key].last)) acc[key].last = order.created_at;
                    return acc;
                  }, {})).map((cust: any) => (
                    <tr key={cust.id} className="hover:bg-brand-light">
@@ -352,7 +439,7 @@ export const AdminDashboard: React.FC = () => {
                      {productForm.images.map((img, i) => (
                        <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-brand-cream">
                          <img src={img} className="w-full h-full object-cover"/>
-                         <button type="button" onClick={()=>removeImage(i)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
+                         <button type="button" onClick={()=>setProductForm(prev=>({...prev, images: prev.images.filter((_,idx)=>idx!==i)}))} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
                        </div>
                      ))}
                      <label className="border-2 border-dashed border-brand-cream rounded-lg flex items-center justify-center cursor-pointer hover:bg-brand-light aspect-square transition-colors">
@@ -378,7 +465,7 @@ export const AdminDashboard: React.FC = () => {
                       <h4 className="font-bold text-brand-text">{p.name}</h4>
                       <div className="flex items-center gap-2">
                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${p.status==='active'?'bg-green-100 text-green-700':'bg-slate-100 text-slate-600'}`}>{p.status.replace('_',' ')}</span>
-                         <button onClick={()=>startEdit(p)} className="p-1.5 hover:bg-brand-light rounded-lg"><Edit2 size={16} className="text-brand-muted"/></button>
+                         <button onClick={() => startEdit(p)} className="p-1.5 hover:bg-brand-light rounded-lg"><Edit2 size={16} className="text-brand-muted"/></button>
                       </div>
                     </div>
                     <div className="flex gap-6 mt-2 text-sm text-brand-muted">
@@ -398,46 +485,47 @@ export const AdminDashboard: React.FC = () => {
         {/* COUPONS */}
         {activeTab === 'coupons' && (
            <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in">
-             <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream flex gap-4 items-end">
-               <div className="flex-1">
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream flex gap-4 items-end flex-wrap">
+               <div className="flex-1 min-w-[150px]">
                  <label className="text-xs font-bold text-brand-muted uppercase">Code</label>
                  <input value={newCouponCode} onChange={e=>setNewCouponCode(e.target.value)} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl mt-1 uppercase focus:border-brand-brown outline-none" placeholder="SUMMER2026" />
                </div>
-               <div className="w-32">
-                  <label className="text-xs font-bold text-brand-muted uppercase">Discount %</label>
+               <div className="w-24">
+                  <label className="text-xs font-bold text-brand-muted uppercase">Disc %</label>
                   <input type="number" value={newCouponDiscount} onChange={e=>setNewCouponDiscount(e.target.value)} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl mt-1 focus:border-brand-brown outline-none" placeholder="10" />
+               </div>
+               <div className="w-32">
+                  <label className="text-xs font-bold text-brand-muted uppercase">Min Order</label>
+                  <input type="number" value={minOrderVal} onChange={e=>setMinOrderVal(e.target.value)} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl mt-1 focus:border-brand-brown outline-none" placeholder="Optional" />
                </div>
                <button onClick={async (e) => {
                   e.preventDefault();
-                  if (!newCouponCode || !newCouponDiscount) return toast.error("Fill all fields");
+                  if (!newCouponCode || !newCouponDiscount) return toast.error("Fill Code & Discount");
                   const {error} = await supabase.from('coupons').insert({
                     code: newCouponCode.toUpperCase(), 
                     discount_percentage: parseInt(newCouponDiscount),
+                    min_order_value: minOrderVal ? parseInt(minOrderVal) : 0,
                     is_active: true
                   });
                   if(error) toast.error("Error: " + error.message); 
-                  else { toast.success("Added"); fetchCoupons(); setNewCouponCode(''); setNewCouponDiscount(''); }
+                  else { toast.success("Added"); fetchCoupons(); setNewCouponCode(''); setNewCouponDiscount(''); setMinOrderVal(''); }
                }} className="bg-brand-brown text-white px-6 py-3 rounded-xl font-bold h-[52px] hover:bg-brand-dark transition-colors">Add</button>
              </div>
              
              <div className="bg-white rounded-2xl border border-brand-cream overflow-hidden">
-                {coupons.length === 0 && <p className="p-6 text-center text-brand-muted">No coupons active.</p>}
                 {coupons.map(c => (
                   <div key={c.id} className="flex justify-between items-center p-4 border-b border-brand-cream last:border-0 hover:bg-brand-light">
                     <div className="flex items-center gap-4">
                       <Tag className="text-brand-muted" size={20}/>
                       <div>
                         <p className="font-bold text-brand-text font-mono">{c.code}</p>
-                        <p className="text-xs text-brand-muted">Used {c.usage_count || 0} times</p>
+                        <p className="text-xs text-brand-muted">Min Order: ₹{c.min_order_value || 0} • Used {c.usage_count || 0}x</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-bold">{c.discount_percentage}% OFF</span>
                       <button onClick={async () => {
-                         if(confirm('Delete coupon?')) {
-                             await supabase.from('coupons').delete().eq('id', c.id);
-                             fetchCoupons();
-                         }
+                         if(confirm('Delete coupon?')) { await supabase.from('coupons').delete().eq('id', c.id); fetchCoupons(); }
                       }}><X size={16} className="text-brand-muted hover:text-red-500"/></button>
                     </div>
                   </div>
@@ -456,71 +544,49 @@ export const AdminDashboard: React.FC = () => {
               <button onClick={()=>setSelectedOrderDetails(null)} className="p-1 hover:bg-brand-light rounded-full"><X size={20}/></button>
             </div>
             <div className="p-6 space-y-6">
+              {/* Shipping & Payment Info */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                 <div className="bg-brand-light p-4 rounded-xl border border-brand-cream">
                   <h4 className="font-bold text-brand-muted uppercase text-xs mb-3 flex items-center gap-2"><MapPin size={14}/> Shipping Address</h4>
                   <p className="font-bold text-brand-text whitespace-pre-line text-base">{selectedOrderDetails.shipping_address}</p>
-                   <div className="mt-3 pt-3 border-t border-brand-cream flex items-center gap-2 text-brand-muted">
-                      <Phone size={14}/> <span>(Customer Contact in Address)</span>
-                   </div>
                 </div>
-                
-                <div className="bg-brand-light p-4 rounded-xl border border-brand-cream flex flex-col justify-between">
-                  <div>
-                    <h4 className="font-bold text-brand-muted uppercase text-xs mb-3 flex items-center gap-2"><CreditCard size={14}/> Payment Info</h4>
+                <div className="bg-brand-light p-4 rounded-xl border border-brand-cream">
+                    <h4 className="font-bold text-brand-muted uppercase text-xs mb-3 flex items-center gap-2"><CreditCard size={14}/> Payment</h4>
                     <p className="font-bold text-brand-text">{selectedOrderDetails.payment_method}</p>
                     <p className="text-brand-muted text-xs mt-1">Date: {new Date(selectedOrderDetails.created_at).toLocaleString()}</p>
-                  </div>
-                  <div className="mt-4">
-                     <select 
-                       value={selectedOrderDetails.status} 
-                       onChange={(e) => updateOrderStatus(selectedOrderDetails.id, e.target.value)}
-                       className={`w-full px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wide cursor-pointer outline-none border border-brand-brown/20 ${selectedOrderDetails.status==='Pending'?'bg-amber-100 text-amber-700':selectedOrderDetails.status==='Shipped'?'bg-blue-100 text-blue-700':selectedOrderDetails.status==='Delivered'?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'}`}
-                     >
-                        <option value="Pending">Pending</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                     </select>
-                  </div>
+                    <div className="mt-3">
+                         <label className="text-xs font-bold text-brand-muted uppercase">Status</label>
+                         <select value={selectedOrderDetails.status} onChange={(e) => updateOrderStatus(selectedOrderDetails.id, e.target.value)}
+                           className="w-full mt-1 px-2 py-1.5 rounded border border-brand-cream bg-white text-xs font-bold uppercase cursor-pointer">
+                            <option value="Pending">Pending</option><option value="Shipped">Shipped</option><option value="Delivered">Delivered</option><option value="Cancelled">Cancelled</option>
+                         </select>
+                    </div>
                 </div>
               </div>
-
+              
+              {/* UPI Proof */}
               {selectedOrderDetails.payment_method === 'UPI' && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                  <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
-                    <CheckSquare size={16} className="text-emerald-600"/> Payment Verification
-                  </h4>
+                  <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2"><CheckSquare size={16}/> Payment Verification</h4>
                   {selectedOrderDetails.payment_proof_url ? (
-                    <div className="space-y-3">
-                      <div className="relative group rounded-lg overflow-hidden border border-slate-300 bg-white max-w-sm mx-auto">
-                         <img src={selectedOrderDetails.payment_proof_url} alt="Payment Proof" className="w-full h-auto object-contain max-h-80" />
-                         <a href={selectedOrderDetails.payment_proof_url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold gap-2">
-                           <ExternalLink size={18} /> View Full Size
-                         </a>
-                      </div>
-                      <p className="text-xs text-center text-slate-500">Verify matches Total: <b>₹{selectedOrderDetails.total_amount}</b></p>
+                    <div className="relative group rounded-lg overflow-hidden border border-slate-300 bg-white max-w-sm mx-auto">
+                         <img src={selectedOrderDetails.payment_proof_url} className="w-full h-auto object-contain max-h-80" />
+                         <a href={selectedOrderDetails.payment_proof_url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold gap-2"><ExternalLink size={18} /> View</a>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3 text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
-                       <AlertTriangle size={20} /> <span className="text-sm font-bold">User selected UPI but no screenshot found.</span>
-                    </div>
-                  )}
+                  ) : <div className="text-red-600 font-bold text-sm"><AlertTriangle size={16} className="inline"/> No Screenshot</div>}
                 </div>
               )}
               
+              {/* Items Table */}
               <div className="border border-brand-cream rounded-xl overflow-hidden">
                 <table className="w-full text-sm text-left">
-                  <thead className="bg-brand-light border-b border-brand-cream">
-                    <tr><th className="p-3">Product</th><th className="p-3">Qty</th><th className="p-3 text-right">Price</th></tr>
-                  </thead>
+                  <thead className="bg-brand-light border-b border-brand-cream"><tr><th className="p-3">Product</th><th className="p-3">Qty</th><th className="p-3 text-right">Price</th></tr></thead>
                   <tbody className="divide-y divide-brand-cream">
                     {selectedOrderDetails.order_items?.map((item: any, i: number) => (
                       <tr key={i}>
                         <td className="p-3 flex items-center gap-3">
-                           {/* Use snapshot name if available, else relational name */}
                            <img src={item.products?.images?.[0]} className="w-10 h-10 rounded bg-brand-light object-cover"/>
-                           <p className="font-medium text-brand-text">{item.product_name_snapshot || item.products?.name || "Deleted Product"}</p>
+                           <p className="font-medium text-brand-text">{item.product_name_snapshot || item.products?.name}</p>
                         </td>
                         <td className="p-3 text-brand-muted">x{item.quantity}</td>
                         <td className="p-3 text-right font-medium text-brand-brown">₹{item.price_at_order * item.quantity}</td>
@@ -528,14 +594,6 @@ export const AdminDashboard: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
-              </div>
-              
-              <div className="flex justify-between items-center pt-4 border-t border-brand-cream">
-                 <p className="text-brand-muted">Applied Coupon: <b className="text-brand-text">{selectedOrderDetails.coupon_code || 'None'}</b></p>
-                 <div className="text-right">
-                    {selectedOrderDetails.discount_applied > 0 && <p className="text-sm text-green-600 font-bold">Discount: -₹{selectedOrderDetails.discount_applied}</p>}
-                    <p className="text-xl font-bold text-brand-brown">Total: ₹{selectedOrderDetails.total_amount}</p>
-                 </div>
               </div>
             </div>
           </div>

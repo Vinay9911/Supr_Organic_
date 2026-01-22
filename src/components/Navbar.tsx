@@ -1,6 +1,6 @@
 import React, { useContext, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, Menu, X, User, LayoutDashboard } from 'lucide-react';
+import { ShoppingBag, Menu, X, User, LayoutDashboard, Heart } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
@@ -15,7 +15,6 @@ export const Navbar: React.FC = () => {
   const location = useLocation();
 
   const handleCartClick = () => {
-    // Open the Side Drawer instead of Checkout Modal
     cartContext?.setIsCartOpen(true);
   };
 
@@ -62,14 +61,11 @@ export const Navbar: React.FC = () => {
               {user ? (
                  <div className="flex items-center gap-4">
                     <Link to="/orders" className="text-sm font-bold text-brand-text hover:text-brand-brown">My Orders</Link>
-                    
-                    {/* FIXED: Uses isAdmin flag from AuthContext */}
                     {isAdmin && (
                       <Link to="/admin" className="flex items-center gap-1 text-sm font-bold text-brand-brown hover:text-brand-dark bg-brand-light px-3 py-1 rounded-full border border-brand-brown/20">
                         <LayoutDashboard size={14}/> Admin
                       </Link>
                     )}
-                    
                     <button onClick={() => signOut()} className="text-sm font-medium text-red-500 hover:text-red-600">Logout</button>
                  </div>
               ) : (
@@ -78,7 +74,15 @@ export const Navbar: React.FC = () => {
                 </button>
               )}
 
-              {/* Cart Button - Opens Drawer */}
+              {/* Wishlist Button */}
+              <Link 
+                to="/wishlist" 
+                className="relative p-3 bg-brand-light rounded-full hover:bg-brand-cream text-brand-brown transition-all hover:scale-105"
+              >
+                <Heart size={20} />
+              </Link>
+
+              {/* Cart Button */}
               <button 
                 onClick={handleCartClick}
                 className="relative p-3 bg-brand-light rounded-full hover:bg-brand-cream text-brand-brown transition-all hover:scale-105"
@@ -114,6 +118,7 @@ export const Navbar: React.FC = () => {
           <div className="md:hidden bg-brand-light border-t border-brand-cream p-4 space-y-4 animate-in slide-in-from-top-5">
             <button onClick={scrollToTop} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Home</button>
             <button onClick={() => scrollToSection('shop')} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Shop</button>
+            <Link to="/wishlist" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Wishlist</Link>
             {user ? (
                <>
                  <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-text font-bold">My Orders</Link>
