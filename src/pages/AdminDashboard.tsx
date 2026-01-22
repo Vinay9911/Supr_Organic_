@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Loader2, Edit2, Save, X, Eye, Search, Square, CheckSquare, Tag, ExternalLink, AlertTriangle, Plus, Phone, MapPin, CreditCard, Trash2 } from 'lucide-react';
+import { Loader2, Edit2, Save, X, Eye, Search, Square, CheckSquare, Tag, ExternalLink, AlertTriangle, Plus, Phone, MapPin, CreditCard, Trash2, Calendar, Users } from 'lucide-react';
 import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { DataContext } from '../context/DataContext';
@@ -7,14 +7,15 @@ import { Product, ProductStatus } from '../types';
 import toast from 'react-hot-toast';
 
 export const AdminDashboard: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'coupons'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'products' | 'coupons' | 'customers'>('overview');
   const [orders, setOrders] = useState<any[]>([]);
   const [coupons, setCoupons] = useState<any[]>([]);
   const { products, refreshProducts } = useContext(DataContext)!;
 
-  // Order filters
+  // Filters
   const [orderSearch, setOrderSearch] = useState('');
   const [orderFilter, setOrderFilter] = useState('All');
+  const [dateFilter, setDateFilter] = useState('');
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedOrderDetails, setSelectedOrderDetails] = useState<any | null>(null);
 
@@ -36,6 +37,7 @@ export const AdminDashboard: React.FC = () => {
   }, []);
 
   const fetchOrders = async () => {
+    // Selecting product_name_snapshot to fix "Unknown Product" issue on deleted items
     const { data, error } = await supabase
       .from('orders')
       .select(`
@@ -43,6 +45,7 @@ export const AdminDashboard: React.FC = () => {
         order_items (
           quantity,
           price_at_order,
+          product_name_snapshot, 
           products (name, images)
         )
       `)
@@ -57,29 +60,22 @@ export const AdminDashboard: React.FC = () => {
     if (!error) setCoupons(data || []);
   };
 
-  // --- ORDER ACTIONS ---
+  // --- ORDER LOGIC ---
   const filteredOrders = orders.filter(o => {
     const matchesSearch = o.id.includes(orderSearch) || o.shipping_address?.toLowerCase().includes(orderSearch.toLowerCase());
     const matchesStatus = orderFilter === 'All' || o.status === orderFilter;
-    return matchesSearch && matchesStatus;
+    const matchesDate = dateFilter ? o.created_at.startsWith(dateFilter) : true;
+    return matchesSearch && matchesStatus && matchesDate;
   });
 
   const updateOrderStatus = async (orderId: string, status: string) => {
-    // 1. Optimistic Update (Update UI Immediately)
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
     if (selectedOrderDetails?.id === orderId) {
        setSelectedOrderDetails((prev: any) => ({ ...prev, status }));
     }
-
-    // 2. Database Update
     const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
-    
-    if (error) {
-      toast.error("Failed to update status");
-      fetchOrders(); // Revert on error
-    } else {
-      toast.success(`Order marked as ${status}`);
-    }
+    if (error) { toast.error("Failed to update status"); fetchOrders(); }
+    else toast.success(`Order marked as ${status}`);
   };
 
   const toggleSelectOrder = (id: string) => {
@@ -90,25 +86,28 @@ export const AdminDashboard: React.FC = () => {
     if (!confirm(`Mark ${selectedOrders.length} orders as ${status}?`)) return;
     const { error } = await supabase.from('orders').update({ status }).in('id', selectedOrders);
     if (error) toast.error("Failed");
-    else {
-      toast.success("Updated");
-      fetchOrders();
-      setSelectedOrders([]);
-    }
+    else { toast.success("Updated"); fetchOrders(); setSelectedOrders([]); }
   };
 
-  // --- PRODUCT ACTIONS ---
+  // --- PRODUCT ACTIONS (FIXED IMAGE UPLOAD) ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
-      const file = e.target.files[0];
-      const filePath = `prod_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
-      const { error } = await supabase.storage.from('products').upload(filePath, file);
-      if (error) throw error;
-      const { data } = supabase.storage.from('products').getPublicUrl(filePath);
-      setProductForm(prev => ({ ...prev, images: [...prev.images, data.publicUrl] }));
-      toast.success('Image uploaded');
+      
+      const newImages: string[] = [];
+      // Loop through all selected files
+      for (let i = 0; i < e.target.files.length; i++) {
+        const file = e.target.files[i];
+        const filePath = `prod_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+        const { error } = await supabase.storage.from('products').upload(filePath, file);
+        if (error) throw error;
+        const { data } = supabase.storage.from('products').getPublicUrl(filePath);
+        newImages.push(data.publicUrl);
+      }
+      
+      setProductForm(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
+      toast.success(`${newImages.length} images uploaded`);
     } catch (error: any) { toast.error("Upload failed: " + error.message); } 
     finally { setUploading(false); }
   };
@@ -146,13 +145,9 @@ export const AdminDashboard: React.FC = () => {
   };
 
   const handleSoftDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this product?")) return;
+    if (!confirm("Delete this product? It will remain in past orders.")) return;
     const { error } = await supabase.from('products').update({ is_deleted: true, status: 'hidden' }).eq('id', id);
-    if (error) toast.error("Failed to delete");
-    else {
-      toast.success("Product deleted");
-      refreshProducts();
-    }
+    if (error) toast.error("Failed"); else { toast.success("Deleted"); refreshProducts(); }
   };
 
   const startEdit = (p: Product) => {
@@ -162,9 +157,9 @@ export const AdminDashboard: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // --- CHART ---
+  // --- ANALYTICS ---
   const getRevenueData = () => {
-    const days = 30; // 30 Day history
+    const days = 30;
     const data = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date();
@@ -182,12 +177,12 @@ export const AdminDashboard: React.FC = () => {
     <div className="min-h-screen bg-brand-light pt-24 pb-20 px-4 sm:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
         
-        {/* Navigation */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           <h1 className="text-3xl font-serif font-bold text-brand-text">Admin Dashboard</h1>
-          <div className="flex bg-white p-1 rounded-xl border border-brand-cream shadow-sm">
-            {['overview', 'orders', 'products', 'coupons'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${activeTab === tab ? 'bg-brand-brown text-white' : 'text-brand-muted hover:text-brand-brown'}`}>{tab}</button>
+          <div className="flex bg-white p-1 rounded-xl border border-brand-cream shadow-sm overflow-x-auto max-w-full">
+            {['overview', 'orders', 'products', 'customers', 'coupons'].map(tab => (
+              <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-lg text-sm font-medium capitalize whitespace-nowrap transition-colors ${activeTab === tab ? 'bg-brand-brown text-white' : 'text-brand-muted hover:text-brand-brown'}`}>{tab}</button>
             ))}
           </div>
         </div>
@@ -196,6 +191,7 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'overview' && (
           <div className="space-y-6 animate-in fade-in">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {/* Stats Cards */}
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
                 <p className="text-xs font-bold text-brand-muted uppercase">Total Revenue</p>
                 <p className="text-3xl font-bold text-brand-brown mt-2">₹{orders.reduce((a,c) => a + c.total_amount, 0).toLocaleString()}</p>
@@ -205,12 +201,12 @@ export const AdminDashboard: React.FC = () => {
                 <p className="text-3xl font-bold text-brand-text mt-2">{orders.length}</p>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
-                <p className="text-xs font-bold text-brand-muted uppercase">Pending Orders</p>
+                <p className="text-xs font-bold text-brand-muted uppercase">Pending</p>
                 <p className="text-3xl font-bold text-amber-500 mt-2">{orders.filter(o=>o.status==='Pending').length}</p>
               </div>
               <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
                 <p className="text-xs font-bold text-brand-muted uppercase">Customers</p>
-                <p className="text-3xl font-bold text-blue-600 mt-2">{new Set(orders.map(o=>o.user_id)).size}</p>
+                <p className="text-3xl font-bold text-blue-600 mt-2">{new Set(orders.map(o=>o.user_id).filter(Boolean)).size}</p>
               </div>
             </div>
              <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream h-96">
@@ -230,12 +226,16 @@ export const AdminDashboard: React.FC = () => {
         {activeTab === 'orders' && (
           <div className="space-y-4 animate-in fade-in">
              <div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-xl border border-brand-cream">
-               <div className="flex gap-4 flex-1">
+               <div className="flex flex-col sm:flex-row gap-4 flex-1">
                  <div className="relative flex-1 max-w-sm">
                    <Search className="absolute left-3 top-3 text-brand-muted" size={18}/>
                    <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="Search ID or Address..." className="w-full pl-10 p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none focus:ring-2 focus:ring-brand-brown/50"/>
                  </div>
-                 <select value={orderFilter} onChange={e=>setOrderFilter(e.target.value)} className="p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none">
+                 <div className="flex items-center gap-2 bg-brand-light border border-brand-cream rounded-lg px-3">
+                    <Calendar size={16} className="text-brand-muted"/>
+                    <input type="date" value={dateFilter} onChange={e => setDateFilter(e.target.value)} className="bg-transparent outline-none text-sm py-2"/>
+                 </div>
+                 <select value={orderFilter} onChange={e=>setOrderFilter(e.target.value)} className="p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none cursor-pointer">
                    <option value="All">All Status</option>
                    <option value="Pending">Pending</option>
                    <option value="Shipped">Shipped</option>
@@ -250,13 +250,14 @@ export const AdminDashboard: React.FC = () => {
                )}
              </div>
 
-             <div className="bg-white rounded-xl border border-brand-cream overflow-hidden">
-                <table className="w-full text-left border-collapse">
+             <div className="bg-white rounded-xl border border-brand-cream overflow-hidden overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[800px]">
                   <thead className="bg-brand-light text-xs font-bold text-brand-muted uppercase">
                     <tr>
                       <th className="p-4 w-10"><Square size={16}/></th>
                       <th className="p-4">Order ID</th>
                       <th className="p-4">Customer</th>
+                      <th className="p-4">Date</th>
                       <th className="p-4">Total</th>
                       <th className="p-4">Status</th>
                       <th className="p-4">Actions</th>
@@ -272,6 +273,7 @@ export const AdminDashboard: React.FC = () => {
                         </td>
                         <td className="p-4 font-mono text-brand-text">#{order.id.slice(0,8)}</td>
                         <td className="p-4 max-w-xs truncate" title={order.shipping_address}>{order.shipping_address?.split(',')[0]}</td>
+                        <td className="p-4 text-brand-muted">{new Date(order.created_at).toLocaleDateString()}</td>
                         <td className="p-4 font-bold text-brand-brown">₹{order.total_amount}</td>
                         <td className="p-4">
                            <select 
@@ -291,6 +293,37 @@ export const AdminDashboard: React.FC = () => {
                   </tbody>
                 </table>
              </div>
+          </div>
+        )}
+
+        {/* CUSTOMERS TAB (NEW) */}
+        {activeTab === 'customers' && (
+          <div className="bg-white rounded-xl border border-brand-cream overflow-hidden animate-in fade-in">
+             <div className="p-6 border-b border-brand-cream">
+               <h2 className="font-bold text-xl flex items-center gap-2"><Users className="text-brand-brown"/> Customer Database</h2>
+             </div>
+             <table className="w-full text-left">
+               <thead className="bg-brand-light text-xs font-bold text-brand-muted uppercase">
+                 <tr><th className="p-4">User ID / Email</th><th className="p-4">Total Orders</th><th className="p-4">Total Spent</th><th className="p-4">Last Order</th></tr>
+               </thead>
+               <tbody className="divide-y divide-brand-cream text-sm">
+                 {Object.values(orders.reduce((acc: any, order) => {
+                   if(!order.user_id) return acc;
+                   if(!acc[order.user_id]) acc[order.user_id] = { id: order.user_id, count: 0, spent: 0, last: order.created_at };
+                   acc[order.user_id].count++;
+                   acc[order.user_id].spent += order.total_amount;
+                   if(new Date(order.created_at) > new Date(acc[order.user_id].last)) acc[order.user_id].last = order.created_at;
+                   return acc;
+                 }, {})).map((cust: any) => (
+                   <tr key={cust.id} className="hover:bg-brand-light">
+                     <td className="p-4 font-mono">{cust.id}</td>
+                     <td className="p-4 font-bold">{cust.count}</td>
+                     <td className="p-4 text-brand-brown font-bold">₹{cust.spent}</td>
+                     <td className="p-4 text-brand-muted">{new Date(cust.last).toLocaleDateString()}</td>
+                   </tr>
+                 ))}
+               </tbody>
+             </table>
           </div>
         )}
 
@@ -323,7 +356,7 @@ export const AdminDashboard: React.FC = () => {
                        </div>
                      ))}
                      <label className="border-2 border-dashed border-brand-cream rounded-lg flex items-center justify-center cursor-pointer hover:bg-brand-light aspect-square transition-colors">
-                        <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        <input type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
                         {uploading ? <Loader2 className="animate-spin text-brand-brown"/> : <Plus size={24} className="text-brand-muted"/>}
                      </label>
                    </div>
@@ -427,7 +460,6 @@ export const AdminDashboard: React.FC = () => {
                 <div className="bg-brand-light p-4 rounded-xl border border-brand-cream">
                   <h4 className="font-bold text-brand-muted uppercase text-xs mb-3 flex items-center gap-2"><MapPin size={14}/> Shipping Address</h4>
                   <p className="font-bold text-brand-text whitespace-pre-line text-base">{selectedOrderDetails.shipping_address}</p>
-                  
                    <div className="mt-3 pt-3 border-t border-brand-cream flex items-center gap-2 text-brand-muted">
                       <Phone size={14}/> <span>(Customer Contact in Address)</span>
                    </div>
@@ -459,32 +491,19 @@ export const AdminDashboard: React.FC = () => {
                   <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
                     <CheckSquare size={16} className="text-emerald-600"/> Payment Verification
                   </h4>
-                  
                   {selectedOrderDetails.payment_proof_url ? (
                     <div className="space-y-3">
                       <div className="relative group rounded-lg overflow-hidden border border-slate-300 bg-white max-w-sm mx-auto">
-                         <img 
-                           src={selectedOrderDetails.payment_proof_url} 
-                           alt="Payment Proof" 
-                           className="w-full h-auto object-contain max-h-80" 
-                         />
-                         <a 
-                           href={selectedOrderDetails.payment_proof_url} 
-                           target="_blank" 
-                           rel="noreferrer"
-                           className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold gap-2"
-                         >
+                         <img src={selectedOrderDetails.payment_proof_url} alt="Payment Proof" className="w-full h-auto object-contain max-h-80" />
+                         <a href={selectedOrderDetails.payment_proof_url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold gap-2">
                            <ExternalLink size={18} /> View Full Size
                          </a>
                       </div>
-                      <p className="text-xs text-center text-slate-500">
-                        Verify matches Total: <b>₹{selectedOrderDetails.total_amount}</b>
-                      </p>
+                      <p className="text-xs text-center text-slate-500">Verify matches Total: <b>₹{selectedOrderDetails.total_amount}</b></p>
                     </div>
                   ) : (
                     <div className="flex items-center gap-3 text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
-                       <AlertTriangle size={20} />
-                       <span className="text-sm font-bold">User selected UPI but no screenshot found.</span>
+                       <AlertTriangle size={20} /> <span className="text-sm font-bold">User selected UPI but no screenshot found.</span>
                     </div>
                   )}
                 </div>
@@ -499,8 +518,9 @@ export const AdminDashboard: React.FC = () => {
                     {selectedOrderDetails.order_items?.map((item: any, i: number) => (
                       <tr key={i}>
                         <td className="p-3 flex items-center gap-3">
+                           {/* Use snapshot name if available, else relational name */}
                            <img src={item.products?.images?.[0]} className="w-10 h-10 rounded bg-brand-light object-cover"/>
-                           <p className="font-medium text-brand-text">{item.products?.name || "Unknown Product"}</p>
+                           <p className="font-medium text-brand-text">{item.product_name_snapshot || item.products?.name || "Deleted Product"}</p>
                         </td>
                         <td className="p-3 text-brand-muted">x{item.quantity}</td>
                         <td className="p-3 text-right font-medium text-brand-brown">₹{item.price_at_order * item.quantity}</td>

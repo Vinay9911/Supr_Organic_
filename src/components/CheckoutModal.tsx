@@ -82,7 +82,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
     setLoading(true);
 
     try {
-      // 1. Stock Validation
+      // 1. Double-Check Stock Validation
       const isStockValid = await cartContext.validateStock();
       if (!isStockValid) {
         setLoading(false);
@@ -97,7 +97,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
       let paymentProofUrl = null;
       if (paymentMethod === 'UPI' && paymentFile) {
         const fileName = `${Date.now()}_${paymentFile.name.replace(/[^a-zA-Z0-9.]/g, '')}`;
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from('payment_proofs')
           .upload(fileName, paymentFile);
         
@@ -116,8 +116,8 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         .insert({
           user_id: userId || null, 
           total_amount: finalAmount,
-          status: 'Pending', // Or 'Verification Pending' if you prefer
-          shipping_address: `${formData.name}, ${formData.address}, Ph: ${formData.phone}`,
+          status: 'Pending',
+          shipping_address: `${formData.name}, ${formData.address}, Ph: ${formData.phone}, Email: ${formData.email}`,
           payment_method: paymentMethod === 'UPI' ? 'UPI' : 'Cash on Delivery',
           payment_proof_url: paymentProofUrl,
           coupon_code: appliedCoupon,
@@ -128,13 +128,14 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
 
       if (orderError) throw orderError;
 
-      // 4. Create Order Items & Deduct Stock
+      // 4. Create Order Items (WITH SNAPSHOT)
       for (const item of cartContext.cart) {
         await supabase.from('order_items').insert({
           order_id: orderData.id,
           product_id: item.productId,
           quantity: item.quantity,
-          price_at_order: item.product.price
+          price_at_order: item.product.price,
+          product_name_snapshot: item.product.name // <--- SNAPSHOT FIX
         });
 
         // Deduct Stock
@@ -144,6 +145,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         });
         
         if (stockError) {
+           // Fallback if RPC fails
            const newStock = item.product.stock - item.quantity;
            await supabase.from('products').update({ stock: newStock }).eq('id', item.productId);
         }
@@ -154,7 +156,7 @@ export const CheckoutModal: React.FC<CheckoutModalProps> = ({ isOpen, onClose })
         await supabase.rpc('increment_coupon_usage', { coupon_code: appliedCoupon });
       }
 
-      toast.success('Order placed! We will verify your payment shortly.');
+      toast.success('Order placed successfully! Confirmation email sent.');
       cartContext.clearCart();
       onClose();
       
