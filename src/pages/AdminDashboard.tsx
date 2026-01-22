@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Loader2, Edit2, Trash2, Save, X, Eye, EyeOff, Clock, Package, ChevronDown, ChevronUp } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { Loader2, Edit2, Save, X, Eye, Search, Square, CheckSquare, Tag, ExternalLink, AlertTriangle, Plus, Phone, MapPin, CreditCard, Trash2 } from 'lucide-react';
+import { BarChart, Bar, ResponsiveContainer, XAxis, Tooltip } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { DataContext } from '../context/DataContext';
 import { Product, ProductStatus } from '../types';
@@ -12,23 +12,27 @@ export const AdminDashboard: React.FC = () => {
   const [coupons, setCoupons] = useState<any[]>([]);
   const { products, refreshProducts } = useContext(DataContext)!;
 
-  // Products Filter
-  const visibleProducts = products.filter(p => !p.is_deleted);
+  // Order filters
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderFilter, setOrderFilter] = useState('All');
+  const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [selectedOrderDetails, setSelectedOrderDetails] = useState<any | null>(null);
 
-  // Form States
+  // Product Form
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productForm, setProductForm] = useState({ 
-    name: '', desc: '', price: '', stock: '', weight: '', img: '', status: 'active' as ProductStatus 
+    name: '', desc: '', price: '', stock: '', weight: '', images: [] as string[], status: 'active' as ProductStatus 
   });
   const [uploading, setUploading] = useState(false);
   
-  // Coupon State
+  // Coupon Form
   const [newCouponCode, setNewCouponCode] = useState('');
   const [newCouponDiscount, setNewCouponDiscount] = useState('');
 
   useEffect(() => { 
+    window.scrollTo(0, 0);
     fetchOrders(); 
-    fetchCoupons();
+    fetchCoupons(); 
   }, []);
 
   const fetchOrders = async () => {
@@ -39,58 +43,92 @@ export const AdminDashboard: React.FC = () => {
         order_items (
           quantity,
           price_at_order,
-          products (name)
+          products (name, images)
         )
       `)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error("Error fetching orders:", error);
-      toast.error("Failed to load orders");
-    } else {
-      setOrders(data || []);
-    }
+    if (error) toast.error("Failed to load orders");
+    else setOrders(data || []);
   };
 
   const fetchCoupons = async () => {
-    const { data } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
-    setCoupons(data || []);
+    const { data, error } = await supabase.from('coupons').select('*').order('created_at', { ascending: false });
+    if (!error) setCoupons(data || []);
   };
 
+  // --- ORDER ACTIONS ---
+  const filteredOrders = orders.filter(o => {
+    const matchesSearch = o.id.includes(orderSearch) || o.shipping_address?.toLowerCase().includes(orderSearch.toLowerCase());
+    const matchesStatus = orderFilter === 'All' || o.status === orderFilter;
+    return matchesSearch && matchesStatus;
+  });
+
   const updateOrderStatus = async (orderId: string, status: string) => {
+    // 1. Optimistic Update (Update UI Immediately)
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+    if (selectedOrderDetails?.id === orderId) {
+       setSelectedOrderDetails((prev: any) => ({ ...prev, status }));
+    }
+
+    // 2. Database Update
     const { error } = await supabase.from('orders').update({ status }).eq('id', orderId);
-    if (error) toast.error("Failed to update status");
-    else {
+    
+    if (error) {
+      toast.error("Failed to update status");
+      fetchOrders(); // Revert on error
+    } else {
       toast.success(`Order marked as ${status}`);
-      fetchOrders();
     }
   };
 
+  const toggleSelectOrder = (id: string) => {
+    setSelectedOrders(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const bulkUpdateStatus = async (status: string) => {
+    if (!confirm(`Mark ${selectedOrders.length} orders as ${status}?`)) return;
+    const { error } = await supabase.from('orders').update({ status }).in('id', selectedOrders);
+    if (error) toast.error("Failed");
+    else {
+      toast.success("Updated");
+      fetchOrders();
+      setSelectedOrders([]);
+    }
+  };
+
+  // --- PRODUCT ACTIONS ---
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
       const file = e.target.files[0];
-      const filePath = `${Math.random()}.${file.name.split('.').pop()}`;
+      const filePath = `prod_${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`;
       const { error } = await supabase.storage.from('products').upload(filePath, file);
       if (error) throw error;
       const { data } = supabase.storage.from('products').getPublicUrl(filePath);
-      setProductForm(prev => ({ ...prev, img: data.publicUrl }));
+      setProductForm(prev => ({ ...prev, images: [...prev.images, data.publicUrl] }));
       toast.success('Image uploaded');
-    } catch (error: any) { toast.error(error.message); } 
+    } catch (error: any) { toast.error("Upload failed: " + error.message); } 
     finally { setUploading(false); }
+  };
+
+  const removeImage = (index: number) => {
+    setProductForm(prev => ({ ...prev, images: prev.images.filter((_, i) => i !== index) }));
   };
 
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      if (productForm.images.length === 0) throw new Error("At least one image is required");
+      
       const payload = {
         name: productForm.name,
         description: productForm.desc,
         price: parseFloat(productForm.price),
         stock: parseInt(productForm.stock),
         weight: productForm.weight,
-        images: [productForm.img],
+        images: productForm.images,
         status: productForm.status,
       };
 
@@ -102,174 +140,220 @@ export const AdminDashboard: React.FC = () => {
         toast.success("Product Created");
       }
       setEditingProduct(null);
-      setProductForm({ name: '', desc: '', price: '', stock: '', weight: '', img: '', status: 'active' });
+      setProductForm({ name: '', desc: '', price: '', stock: '', weight: '', images: [], status: 'active' });
       refreshProducts();
     } catch (err: any) { toast.error(err.message); }
   };
 
   const handleSoftDelete = async (id: string) => {
-    if (!window.confirm("Are you sure?")) return;
-    await supabase.from('products').update({ is_deleted: true, status: 'hidden' }).eq('id', id);
-    toast.success("Product deleted");
-    refreshProducts();
+    if (!confirm("Are you sure you want to delete this product?")) return;
+    const { error } = await supabase.from('products').update({ is_deleted: true, status: 'hidden' }).eq('id', id);
+    if (error) toast.error("Failed to delete");
+    else {
+      toast.success("Product deleted");
+      refreshProducts();
+    }
   };
 
   const startEdit = (p: Product) => {
     setEditingProduct(p);
-    setProductForm({ name: p.name, desc: p.description, price: p.price.toString(), stock: p.stock.toString(), weight: p.weight, img: p.images[0], status: p.status });
+    setProductForm({ name: p.name, desc: p.description, price: p.price.toString(), stock: p.stock.toString(), weight: p.weight, images: p.images, status: p.status });
     setActiveTab('products');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
-  
+
+  // --- CHART ---
   const getRevenueData = () => {
-    const last7Days = [...Array(7)].map((_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - i);
-        return d.toISOString().split('T')[0];
-    }).reverse();
-    return last7Days.map(date => {
-        const dayOrders = orders.filter(o => o.created_at.startsWith(date));
-        return { name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }), sales: dayOrders.reduce((acc, curr) => acc + curr.total_amount, 0) };
-    });
-  };
-
-  // --- COUPON MANAGEMENT ---
-  const handleAddCoupon = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const { error } = await supabase.from('coupons').insert({
-      code: newCouponCode.toUpperCase(),
-      discount_percentage: parseInt(newCouponDiscount)
-    });
-    if (error) toast.error("Failed to add coupon");
-    else {
-      toast.success("Coupon Added");
-      setNewCouponCode('');
-      setNewCouponDiscount('');
-      fetchCoupons();
+    const days = 30; // 30 Day history
+    const data = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const dailySales = orders
+        .filter(o => o.created_at.startsWith(dateStr))
+        .reduce((sum, o) => sum + o.total_amount, 0);
+      data.push({ name: dateStr.slice(5), sales: dailySales });
     }
+    return data;
   };
-  const deleteCoupon = async (id: string) => {
-    await supabase.from('coupons').delete().eq('id', id);
-    fetchCoupons();
-  }
-
 
   return (
-    <div className="min-h-screen bg-slate-50 pt-24 pb-20 px-4 sm:px-8">
+    <div className="min-h-screen bg-brand-light pt-24 pb-20 px-4 sm:px-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-serif font-bold text-slate-900">Admin Dashboard</h1>
-          <div className="flex bg-white p-1 rounded-xl border border-slate-200">
+        
+        {/* Navigation */}
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+          <h1 className="text-3xl font-serif font-bold text-brand-text">Admin Dashboard</h1>
+          <div className="flex bg-white p-1 rounded-xl border border-brand-cream shadow-sm">
             {['overview', 'orders', 'products', 'coupons'].map(tab => (
-              <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${activeTab === tab ? 'bg-slate-900 text-white' : 'text-slate-500 hover:text-slate-900'}`}>{tab}</button>
+              <button key={tab} onClick={() => setActiveTab(tab as any)} className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${activeTab === tab ? 'bg-brand-brown text-white' : 'text-brand-muted hover:text-brand-brown'}`}>{tab}</button>
             ))}
           </div>
         </div>
 
+        {/* OVERVIEW */}
         {activeTab === 'overview' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="bg-white p-6 rounded-2xl shadow-sm border">
-                <p className="text-xs font-bold text-slate-500 uppercase">Total Revenue</p>
-                <p className="text-3xl font-bold text-emerald-600 mt-2">₹{orders.reduce((a,c) => a + c.total_amount, 0)}</p>
+          <div className="space-y-6 animate-in fade-in">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
+                <p className="text-xs font-bold text-brand-muted uppercase">Total Revenue</p>
+                <p className="text-3xl font-bold text-brand-brown mt-2">₹{orders.reduce((a,c) => a + c.total_amount, 0).toLocaleString()}</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl shadow-sm border">
-                <p className="text-xs font-bold text-slate-500 uppercase">Total Orders</p>
-                <p className="text-3xl font-bold text-slate-900 mt-2">{orders.length}</p>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
+                <p className="text-xs font-bold text-brand-muted uppercase">Total Orders</p>
+                <p className="text-3xl font-bold text-brand-text mt-2">{orders.length}</p>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
+                <p className="text-xs font-bold text-brand-muted uppercase">Pending Orders</p>
+                <p className="text-3xl font-bold text-amber-500 mt-2">{orders.filter(o=>o.status==='Pending').length}</p>
+              </div>
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream">
+                <p className="text-xs font-bold text-brand-muted uppercase">Customers</p>
+                <p className="text-3xl font-bold text-blue-600 mt-2">{new Set(orders.map(o=>o.user_id)).size}</p>
               </div>
             </div>
-             <div className="bg-white p-6 rounded-2xl shadow-sm border h-96">
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream h-96">
+               <h3 className="font-bold text-brand-text mb-4">Sales Analytics (30 Days)</h3>
                <ResponsiveContainer width="100%" height="100%">
-                 <BarChart data={getRevenueData()}><Bar dataKey="sales" fill="#059669" /></BarChart>
+                 <BarChart data={getRevenueData()}>
+                   <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
+                   <Tooltip cursor={{fill: '#f1f5f9'}} contentStyle={{borderRadius: '12px', border:'none', boxShadow:'0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                   <Bar dataKey="sales" fill="#5D4037" radius={[4, 4, 0, 0]} />
+                 </BarChart>
                </ResponsiveContainer>
             </div>
           </div>
         )}
 
+        {/* ORDERS */}
         {activeTab === 'orders' && (
-          <div className="space-y-4">
-             {orders.length === 0 && <div className="text-center p-10 text-slate-400">No orders found.</div>}
-             {orders.map(order => (
-               <div key={order.id} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-                 <div className="p-4 flex justify-between items-center bg-slate-50 border-b border-slate-100">
-                    <div>
-                      <span className="font-mono text-xs text-slate-500">#{order.id.slice(0,8)}</span>
-                      <p className="font-bold text-sm text-slate-800">{order.shipping_address?.split(',')[0] || 'Customer'}</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                       <span className="font-bold text-emerald-600">₹{order.total_amount}</span>
-                       <select 
-                        value={order.status} 
-                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className="bg-white border border-slate-200 text-slate-700 text-xs rounded-lg p-2 outline-none focus:ring-2 focus:ring-emerald-500"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="Shipped">Shipped</option>
-                        <option value="Delivered">Delivered</option>
-                        <option value="Cancelled">Cancelled</option>
-                      </select>
-                    </div>
+          <div className="space-y-4 animate-in fade-in">
+             <div className="flex flex-col md:flex-row gap-4 justify-between bg-white p-4 rounded-xl border border-brand-cream">
+               <div className="flex gap-4 flex-1">
+                 <div className="relative flex-1 max-w-sm">
+                   <Search className="absolute left-3 top-3 text-brand-muted" size={18}/>
+                   <input value={orderSearch} onChange={e=>setOrderSearch(e.target.value)} placeholder="Search ID or Address..." className="w-full pl-10 p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none focus:ring-2 focus:ring-brand-brown/50"/>
                  </div>
-                 {/* Order Items List */}
-                 <div className="p-4 bg-white">
-                   {order.order_items?.map((item: any, i: number) => (
-                     <div key={i} className="flex justify-between text-sm py-1 border-b border-dashed last:border-0 border-slate-100">
-                        <span className="text-slate-600">{item.products?.name || 'Unknown Product'} <span className="text-xs text-slate-400">x{item.quantity}</span></span>
-                        <span className="font-medium">₹{item.price_at_order * item.quantity}</span>
-                     </div>
-                   ))}
-                 </div>
+                 <select value={orderFilter} onChange={e=>setOrderFilter(e.target.value)} className="p-2.5 bg-brand-light border border-brand-cream rounded-lg outline-none">
+                   <option value="All">All Status</option>
+                   <option value="Pending">Pending</option>
+                   <option value="Shipped">Shipped</option>
+                   <option value="Delivered">Delivered</option>
+                 </select>
                </div>
-             ))}
+               {selectedOrders.length > 0 && (
+                 <div className="flex gap-2 items-center animate-in slide-in-from-right">
+                   <span className="text-sm font-bold text-brand-muted">{selectedOrders.length} selected</span>
+                   <button onClick={()=>bulkUpdateStatus('Shipped')} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700">Mark Shipped</button>
+                 </div>
+               )}
+             </div>
+
+             <div className="bg-white rounded-xl border border-brand-cream overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-brand-light text-xs font-bold text-brand-muted uppercase">
+                    <tr>
+                      <th className="p-4 w-10"><Square size={16}/></th>
+                      <th className="p-4">Order ID</th>
+                      <th className="p-4">Customer</th>
+                      <th className="p-4">Total</th>
+                      <th className="p-4">Status</th>
+                      <th className="p-4">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-cream text-sm">
+                    {filteredOrders.map(order => (
+                      <tr key={order.id} className="hover:bg-brand-light transition-colors">
+                        <td className="p-4">
+                          <button onClick={()=>toggleSelectOrder(order.id)}>
+                            {selectedOrders.includes(order.id) ? <CheckSquare className="text-brand-brown" size={18}/> : <Square className="text-brand-muted" size={18}/>}
+                          </button>
+                        </td>
+                        <td className="p-4 font-mono text-brand-text">#{order.id.slice(0,8)}</td>
+                        <td className="p-4 max-w-xs truncate" title={order.shipping_address}>{order.shipping_address?.split(',')[0]}</td>
+                        <td className="p-4 font-bold text-brand-brown">₹{order.total_amount}</td>
+                        <td className="p-4">
+                           <select 
+                             value={order.status} 
+                             onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                             className={`px-2 py-1 rounded text-xs font-bold border-none outline-none cursor-pointer ${order.status==='Pending'?'bg-amber-100 text-amber-700':order.status==='Shipped'?'bg-blue-100 text-blue-700':order.status==='Delivered'?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'}`}
+                           >
+                             <option value="Pending">Pending</option>
+                             <option value="Shipped">Shipped</option>
+                             <option value="Delivered">Delivered</option>
+                             <option value="Cancelled">Cancelled</option>
+                           </select>
+                        </td>
+                        <td className="p-4"><button onClick={()=>setSelectedOrderDetails(order)} className="text-brand-muted hover:text-brand-brown flex items-center gap-1"><Eye size={16}/> View</button></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+             </div>
           </div>
         )}
 
+        {/* PRODUCTS */}
         {activeTab === 'products' && (
-          <div className="grid lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border h-fit sticky top-24">
-              <h2 className="font-bold text-xl mb-4">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
+          <div className="grid lg:grid-cols-3 gap-8 animate-in fade-in">
+            <div className="lg:col-span-1 bg-white p-6 rounded-2xl shadow-sm border border-brand-cream h-fit sticky top-24">
+              <h2 className="font-bold text-xl mb-4 text-brand-text">{editingProduct ? 'Edit Product' : 'Add New Product'}</h2>
               <form onSubmit={handleSaveProduct} className="space-y-4">
-                <input required placeholder="Name" value={productForm.name} onChange={e=>setProductForm({...productForm, name: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" />
-                <textarea required placeholder="Description" value={productForm.desc} onChange={e=>setProductForm({...productForm, desc: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl h-24" />
+                <input required placeholder="Name" value={productForm.name} onChange={e=>setProductForm({...productForm, name: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl focus:border-brand-brown outline-none" />
+                <textarea required placeholder="Description" value={productForm.desc} onChange={e=>setProductForm({...productForm, desc: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl h-24 focus:border-brand-brown outline-none" />
                 <div className="grid grid-cols-2 gap-4">
-                  <input required type="number" placeholder="Price (₹)" value={productForm.price} onChange={e=>setProductForm({...productForm, price: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" />
-                  <input required type="number" placeholder="Stock" value={productForm.stock} onChange={e=>setProductForm({...productForm, stock: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" />
+                  <input required type="number" placeholder="Price (₹)" value={productForm.price} onChange={e=>setProductForm({...productForm, price: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl focus:border-brand-brown outline-none" />
+                  <input required type="number" placeholder="Stock" value={productForm.stock} onChange={e=>setProductForm({...productForm, stock: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl focus:border-brand-brown outline-none" />
                 </div>
-                <input required placeholder="Weight (e.g., 200g)" value={productForm.weight} onChange={e=>setProductForm({...productForm, weight: e.target.value})} className="w-full p-3 bg-slate-50 border rounded-xl" />
+                <input required placeholder="Weight (e.g., 200g)" value={productForm.weight} onChange={e=>setProductForm({...productForm, weight: e.target.value})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl focus:border-brand-brown outline-none" />
+                <select value={productForm.status} onChange={(e) => setProductForm({...productForm, status: e.target.value as ProductStatus})} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl focus:border-brand-brown outline-none">
+                  <option value="active">Active</option>
+                  <option value="hidden">Hidden</option>
+                  <option value="coming_soon">Coming Soon</option>
+                </select>
+                
                 <div>
-                  <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Visibility Status</label>
-                  <select value={productForm.status} onChange={(e) => setProductForm({...productForm, status: e.target.value as ProductStatus})} className="w-full p-3 bg-slate-50 border rounded-xl">
-                    <option value="active">Active (Visible)</option>
-                    <option value="hidden">Hidden (Invisible)</option>
-                    <option value="coming_soon">Coming Soon (Unclickable)</option>
-                  </select>
+                   <label className="text-xs font-bold text-brand-muted uppercase mb-2 block">Images</label>
+                   <div className="grid grid-cols-3 gap-2 mb-2">
+                     {productForm.images.map((img, i) => (
+                       <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-brand-cream">
+                         <img src={img} className="w-full h-full object-cover"/>
+                         <button type="button" onClick={()=>removeImage(i)} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity"><X size={12}/></button>
+                       </div>
+                     ))}
+                     <label className="border-2 border-dashed border-brand-cream rounded-lg flex items-center justify-center cursor-pointer hover:bg-brand-light aspect-square transition-colors">
+                        <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                        {uploading ? <Loader2 className="animate-spin text-brand-brown"/> : <Plus size={24} className="text-brand-muted"/>}
+                     </label>
+                   </div>
                 </div>
-                <div className="relative border-2 border-dashed rounded-xl p-4 text-center">
-                  <input type="file" accept="image/*" onChange={handleImageUpload} className="absolute inset-0 opacity-0 cursor-pointer" />
-                  {uploading ? <Loader2 className="animate-spin mx-auto"/> : productForm.img ? <img src={productForm.img} className="h-20 mx-auto object-contain"/> : <span className="text-sm text-slate-400">Upload Image</span>}
-                </div>
+
                 <div className="flex gap-2">
-                  <button type="submit" disabled={uploading} className="flex-1 bg-emerald-600 text-white font-bold py-3 rounded-xl hover:bg-emerald-700 flex items-center justify-center gap-2"><Save size={16}/> Save</button>
-                  {editingProduct && <button type="button" onClick={()=>{setEditingProduct(null); setProductForm({name:'',desc:'',price:'',stock:'', weight:'',img:'', status:'active'})}} className="bg-slate-100 p-3 rounded-xl"><X size={20}/></button>}
+                  <button type="submit" disabled={uploading} className="flex-1 bg-brand-brown text-white font-bold py-3 rounded-xl hover:bg-brand-dark flex items-center justify-center gap-2"><Save size={16}/> Save</button>
+                  {editingProduct && <button type="button" onClick={()=>{setEditingProduct(null); setProductForm({name:'',desc:'',price:'',stock:'', weight:'',images:[], status:'active'})}} className="bg-brand-light p-3 rounded-xl hover:bg-brand-cream"><X size={20}/></button>}
                 </div>
               </form>
             </div>
-            <div className="lg:col-span-2 grid sm:grid-cols-2 gap-4">
-              {visibleProducts.map(p => (
-                <div key={p.id} className={`bg-white p-4 rounded-xl border flex gap-4 ${p.status === 'hidden' ? 'opacity-60 grayscale' : ''}`}>
-                  <img src={p.images[0]} className="w-20 h-20 object-cover rounded-lg bg-slate-50" />
+
+            <div className="lg:col-span-2 space-y-4">
+              {products.filter(p=>!p.is_deleted).map(p => (
+                <div key={p.id} className={`bg-white p-4 rounded-xl border border-brand-cream flex gap-4 ${p.status === 'hidden' ? 'opacity-60 grayscale' : ''}`}>
+                  <img src={p.images[0]} className="w-20 h-20 object-cover rounded-lg bg-brand-light" />
                   <div className="flex-1">
                     <div className="flex justify-between items-start">
-                      <h4 className="font-bold">{p.name}</h4>
-                      <div className="flex items-center gap-1 text-xs bg-slate-100 px-2 py-1 rounded-full border">
-                         <span className="capitalize">{p.status.replace('_', ' ')}</span>
+                      <h4 className="font-bold text-brand-text">{p.name}</h4>
+                      <div className="flex items-center gap-2">
+                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${p.status==='active'?'bg-green-100 text-green-700':'bg-slate-100 text-slate-600'}`}>{p.status.replace('_',' ')}</span>
+                         <button onClick={()=>startEdit(p)} className="p-1.5 hover:bg-brand-light rounded-lg"><Edit2 size={16} className="text-brand-muted"/></button>
                       </div>
                     </div>
-                    <p className="text-sm text-slate-500">₹{p.price} • {p.weight}</p>
-                    <p className="text-xs text-slate-400 mt-1">Stock: {p.stock}</p>
-                    <div className="flex gap-2 mt-3">
-                      <button onClick={()=>startEdit(p)} className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 hover:bg-emerald-100"><Edit2 size={12}/> Edit</button>
-                      <button onClick={()=>handleSoftDelete(p.id)} className="text-xs bg-red-50 text-red-600 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 hover:bg-red-100"><Trash2 size={12}/> Delete</button>
+                    <div className="flex gap-6 mt-2 text-sm text-brand-muted">
+                      <span>Stock: <b className={p.stock<5?'text-red-500':''}>{p.stock}</b></span>
+                      <span>Price: <b className="text-brand-brown">₹{p.price}</b></span>
+                    </div>
+                    <div className="mt-2 text-right">
+                       <button onClick={()=>handleSoftDelete(p.id)} className="text-xs text-red-500 hover:text-red-700 font-bold flex items-center justify-end gap-1"><Trash2 size={12}/> Delete</button>
                     </div>
                   </div>
                 </div>
@@ -278,34 +362,165 @@ export const AdminDashboard: React.FC = () => {
           </div>
         )}
         
+        {/* COUPONS */}
         {activeTab === 'coupons' && (
-           <div className="max-w-4xl mx-auto">
-             <div className="bg-white p-6 rounded-2xl shadow-sm border mb-8 flex gap-4 items-end">
+           <div className="max-w-2xl mx-auto space-y-8 animate-in fade-in">
+             <div className="bg-white p-6 rounded-2xl shadow-sm border border-brand-cream flex gap-4 items-end">
                <div className="flex-1">
-                 <label className="text-xs font-bold text-slate-500 uppercase">Code</label>
-                 <input value={newCouponCode} onChange={e=>setNewCouponCode(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl mt-1" placeholder="SUMMER2026" />
+                 <label className="text-xs font-bold text-brand-muted uppercase">Code</label>
+                 <input value={newCouponCode} onChange={e=>setNewCouponCode(e.target.value)} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl mt-1 uppercase focus:border-brand-brown outline-none" placeholder="SUMMER2026" />
                </div>
                <div className="w-32">
-                  <label className="text-xs font-bold text-slate-500 uppercase">Discount %</label>
-                  <input type="number" value={newCouponDiscount} onChange={e=>setNewCouponDiscount(e.target.value)} className="w-full p-3 bg-slate-50 border rounded-xl mt-1" placeholder="10" />
+                  <label className="text-xs font-bold text-brand-muted uppercase">Discount %</label>
+                  <input type="number" value={newCouponDiscount} onChange={e=>setNewCouponDiscount(e.target.value)} className="w-full p-3 bg-brand-light border border-brand-cream rounded-xl mt-1 focus:border-brand-brown outline-none" placeholder="10" />
                </div>
-               <button onClick={handleAddCoupon} className="bg-slate-900 text-white px-6 py-3 rounded-xl font-bold h-[50px]">Add Coupon</button>
+               <button onClick={async (e) => {
+                  e.preventDefault();
+                  if (!newCouponCode || !newCouponDiscount) return toast.error("Fill all fields");
+                  const {error} = await supabase.from('coupons').insert({
+                    code: newCouponCode.toUpperCase(), 
+                    discount_percentage: parseInt(newCouponDiscount),
+                    is_active: true
+                  });
+                  if(error) toast.error("Error: " + error.message); 
+                  else { toast.success("Added"); fetchCoupons(); setNewCouponCode(''); setNewCouponDiscount(''); }
+               }} className="bg-brand-brown text-white px-6 py-3 rounded-xl font-bold h-[52px] hover:bg-brand-dark transition-colors">Add</button>
              </div>
-             <div className="bg-white rounded-2xl border overflow-hidden">
+             
+             <div className="bg-white rounded-2xl border border-brand-cream overflow-hidden">
+                {coupons.length === 0 && <p className="p-6 text-center text-brand-muted">No coupons active.</p>}
                 {coupons.map(c => (
-                  <div key={c.id} className="flex justify-between items-center p-4 border-b last:border-0">
-                    <div>
-                      <span className="font-bold text-lg font-mono">{c.code}</span>
-                      <span className="ml-3 bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded text-xs font-bold">{c.discount_percentage}% OFF</span>
+                  <div key={c.id} className="flex justify-between items-center p-4 border-b border-brand-cream last:border-0 hover:bg-brand-light">
+                    <div className="flex items-center gap-4">
+                      <Tag className="text-brand-muted" size={20}/>
+                      <div>
+                        <p className="font-bold text-brand-text font-mono">{c.code}</p>
+                        <p className="text-xs text-brand-muted">Used {c.usage_count || 0} times</p>
+                      </div>
                     </div>
-                    <button onClick={()=>deleteCoupon(c.id)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg"><Trash2 size={18}/></button>
+                    <div className="flex items-center gap-4">
+                      <span className="bg-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-sm font-bold">{c.discount_percentage}% OFF</span>
+                      <button onClick={async () => {
+                         if(confirm('Delete coupon?')) {
+                             await supabase.from('coupons').delete().eq('id', c.id);
+                             fetchCoupons();
+                         }
+                      }}><X size={16} className="text-brand-muted hover:text-red-500"/></button>
+                    </div>
                   </div>
                 ))}
              </div>
            </div>
         )}
-
       </div>
+
+      {/* ORDER DETAILS MODAL */}
+      {selectedOrderDetails && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-brand-dark/50 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-6 border-b border-brand-cream flex justify-between items-center sticky top-0 bg-white z-10">
+              <h2 className="font-bold text-xl text-brand-text">Order #{selectedOrderDetails.id.slice(0,8)}</h2>
+              <button onClick={()=>setSelectedOrderDetails(null)} className="p-1 hover:bg-brand-light rounded-full"><X size={20}/></button>
+            </div>
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div className="bg-brand-light p-4 rounded-xl border border-brand-cream">
+                  <h4 className="font-bold text-brand-muted uppercase text-xs mb-3 flex items-center gap-2"><MapPin size={14}/> Shipping Address</h4>
+                  <p className="font-bold text-brand-text whitespace-pre-line text-base">{selectedOrderDetails.shipping_address}</p>
+                  
+                   <div className="mt-3 pt-3 border-t border-brand-cream flex items-center gap-2 text-brand-muted">
+                      <Phone size={14}/> <span>(Customer Contact in Address)</span>
+                   </div>
+                </div>
+                
+                <div className="bg-brand-light p-4 rounded-xl border border-brand-cream flex flex-col justify-between">
+                  <div>
+                    <h4 className="font-bold text-brand-muted uppercase text-xs mb-3 flex items-center gap-2"><CreditCard size={14}/> Payment Info</h4>
+                    <p className="font-bold text-brand-text">{selectedOrderDetails.payment_method}</p>
+                    <p className="text-brand-muted text-xs mt-1">Date: {new Date(selectedOrderDetails.created_at).toLocaleString()}</p>
+                  </div>
+                  <div className="mt-4">
+                     <select 
+                       value={selectedOrderDetails.status} 
+                       onChange={(e) => updateOrderStatus(selectedOrderDetails.id, e.target.value)}
+                       className={`w-full px-3 py-2 rounded-lg text-xs font-bold uppercase tracking-wide cursor-pointer outline-none border border-brand-brown/20 ${selectedOrderDetails.status==='Pending'?'bg-amber-100 text-amber-700':selectedOrderDetails.status==='Shipped'?'bg-blue-100 text-blue-700':selectedOrderDetails.status==='Delivered'?'bg-emerald-100 text-emerald-700':'bg-red-100 text-red-700'}`}
+                     >
+                        <option value="Pending">Pending</option>
+                        <option value="Shipped">Shipped</option>
+                        <option value="Delivered">Delivered</option>
+                        <option value="Cancelled">Cancelled</option>
+                     </select>
+                  </div>
+                </div>
+              </div>
+
+              {selectedOrderDetails.payment_method === 'UPI' && (
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                  <h4 className="font-bold text-sm text-slate-700 mb-3 flex items-center gap-2">
+                    <CheckSquare size={16} className="text-emerald-600"/> Payment Verification
+                  </h4>
+                  
+                  {selectedOrderDetails.payment_proof_url ? (
+                    <div className="space-y-3">
+                      <div className="relative group rounded-lg overflow-hidden border border-slate-300 bg-white max-w-sm mx-auto">
+                         <img 
+                           src={selectedOrderDetails.payment_proof_url} 
+                           alt="Payment Proof" 
+                           className="w-full h-auto object-contain max-h-80" 
+                         />
+                         <a 
+                           href={selectedOrderDetails.payment_proof_url} 
+                           target="_blank" 
+                           rel="noreferrer"
+                           className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-white font-bold gap-2"
+                         >
+                           <ExternalLink size={18} /> View Full Size
+                         </a>
+                      </div>
+                      <p className="text-xs text-center text-slate-500">
+                        Verify matches Total: <b>₹{selectedOrderDetails.total_amount}</b>
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 text-red-600 bg-red-50 p-3 rounded-lg border border-red-100">
+                       <AlertTriangle size={20} />
+                       <span className="text-sm font-bold">User selected UPI but no screenshot found.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              <div className="border border-brand-cream rounded-xl overflow-hidden">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-brand-light border-b border-brand-cream">
+                    <tr><th className="p-3">Product</th><th className="p-3">Qty</th><th className="p-3 text-right">Price</th></tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-cream">
+                    {selectedOrderDetails.order_items?.map((item: any, i: number) => (
+                      <tr key={i}>
+                        <td className="p-3 flex items-center gap-3">
+                           <img src={item.products?.images?.[0]} className="w-10 h-10 rounded bg-brand-light object-cover"/>
+                           <p className="font-medium text-brand-text">{item.products?.name || "Unknown Product"}</p>
+                        </td>
+                        <td className="p-3 text-brand-muted">x{item.quantity}</td>
+                        <td className="p-3 text-right font-medium text-brand-brown">₹{item.price_at_order * item.quantity}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              
+              <div className="flex justify-between items-center pt-4 border-t border-brand-cream">
+                 <p className="text-brand-muted">Applied Coupon: <b className="text-brand-text">{selectedOrderDetails.coupon_code || 'None'}</b></p>
+                 <div className="text-right">
+                    {selectedOrderDetails.discount_applied > 0 && <p className="text-sm text-green-600 font-bold">Discount: -₹{selectedOrderDetails.discount_applied}</p>}
+                    <p className="text-xl font-bold text-brand-brown">Total: ₹{selectedOrderDetails.total_amount}</p>
+                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

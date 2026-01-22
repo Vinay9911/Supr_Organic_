@@ -1,24 +1,22 @@
 import React, { useContext, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, Menu, X, User } from 'lucide-react';
+import { ShoppingBag, Menu, X, User, LayoutDashboard } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
-import { CheckoutModal } from './CheckoutModal';
 
 export const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   
   const cartContext = useContext(CartContext);
-  const { user, signOut } = useContext(AuthContext)!;
+  const { user, isAdmin, signOut } = useContext(AuthContext)!;
   const navigate = useNavigate();
   const location = useLocation();
 
   const handleCartClick = () => {
-    if (cartContext?.cartCount === 0) return;
-    setIsCheckoutOpen(true);
+    // Open the Side Drawer instead of Checkout Modal
+    cartContext?.setIsCartOpen(true);
   };
 
   const scrollToSection = (sectionId: string) => {
@@ -60,15 +58,19 @@ export const Navbar: React.FC = () => {
             <div className="hidden md:flex items-center gap-8">
               <button onClick={scrollToTop} className="text-sm font-medium text-brand-muted hover:text-brand-brown transition-colors">Home</button>
               <button onClick={() => scrollToSection('shop')} className="text-sm font-medium text-brand-muted hover:text-brand-brown transition-colors">Shop</button>
-              <button onClick={() => scrollToSection('labs')} className="text-sm font-medium text-brand-muted hover:text-brand-brown transition-colors">Our Farms</button>
               
               {user ? (
                  <div className="flex items-center gap-4">
                     <Link to="/orders" className="text-sm font-bold text-brand-text hover:text-brand-brown">My Orders</Link>
-                    {user.email === 'vinaycollege1531@gmail.com' && (
-                      <Link to="/admin" className="text-sm font-bold text-brand-brown hover:text-brand-dark bg-brand-light px-3 py-1 rounded-full border border-brand-brown/20">Admin</Link>
+                    
+                    {/* FIXED: Uses isAdmin flag from AuthContext */}
+                    {isAdmin && (
+                      <Link to="/admin" className="flex items-center gap-1 text-sm font-bold text-brand-brown hover:text-brand-dark bg-brand-light px-3 py-1 rounded-full border border-brand-brown/20">
+                        <LayoutDashboard size={14}/> Admin
+                      </Link>
                     )}
-                    <button onClick={signOut} className="text-sm font-medium text-red-500 hover:text-red-600">Logout</button>
+                    
+                    <button onClick={() => signOut()} className="text-sm font-medium text-red-500 hover:text-red-600">Logout</button>
                  </div>
               ) : (
                 <button onClick={() => setIsAuthOpen(true)} className="flex items-center gap-2 text-sm font-bold text-brand-text hover:text-brand-brown">
@@ -76,7 +78,7 @@ export const Navbar: React.FC = () => {
                 </button>
               )}
 
-              {/* Cart Button */}
+              {/* Cart Button - Opens Drawer */}
               <button 
                 onClick={handleCartClick}
                 className="relative p-3 bg-brand-light rounded-full hover:bg-brand-cream text-brand-brown transition-all hover:scale-105"
@@ -112,10 +114,10 @@ export const Navbar: React.FC = () => {
           <div className="md:hidden bg-brand-light border-t border-brand-cream p-4 space-y-4 animate-in slide-in-from-top-5">
             <button onClick={scrollToTop} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Home</button>
             <button onClick={() => scrollToSection('shop')} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Shop</button>
-            <button onClick={() => scrollToSection('labs')} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Our Farms</button>
             {user ? (
                <>
                  <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-text font-bold">My Orders</Link>
+                 {isAdmin && <Link to="/admin" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-brown font-bold">Admin Dashboard</Link>}
                  <button onClick={()=>{signOut(); setIsMenuOpen(false)}} className="block py-2 text-red-500 font-medium w-full text-left">Logout</button>
                </>
             ) : (
@@ -126,7 +128,6 @@ export const Navbar: React.FC = () => {
       </nav>
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />
-      <CheckoutModal isOpen={isCheckoutOpen} onClose={() => setIsCheckoutOpen(false)} />
     </>
   );
 };

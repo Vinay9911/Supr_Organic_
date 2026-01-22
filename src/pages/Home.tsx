@@ -1,6 +1,6 @@
 import React, { useContext, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Cpu, ShieldCheck, Leaf, Plus, Loader2, Truck, Sparkles, DollarSign, Phone, Mail } from 'lucide-react';
+import { ArrowRight, Cpu, ShieldCheck, Leaf, Plus, Minus, Loader2, Truck, Sparkles, DollarSign, Phone, Mail } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { DataContext } from '../context/DataContext';
 import { SEO } from '../components/SEO';
@@ -31,13 +31,12 @@ export const Home: React.FC = () => {
 
   const visibleProducts = products.filter(p => !p.is_deleted && p.status !== 'hidden');
 
-  // AI SEO: Organization Schema
   const organizationSchema = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Supr Mushrooms",
     "url": window.location.origin,
-    "logo": "https://suprmushrooms.com/logo.png", // Replace with your actual logo URL hosted online
+    "logo": "https://suprmushrooms.com/logo.png",
     "description": "Premium aeroponic saffron and scientifically farmed organic mushrooms in Delhi NCR.",
     "contactPoint": {
       "@type": "ContactPoint",
@@ -47,7 +46,7 @@ export const Home: React.FC = () => {
       "availableLanguage": "en"
     },
     "sameAs": [
-      "https://instagram.com/suprmushrooms", // Replace with real links if available
+      "https://instagram.com/suprmushrooms",
       "https://facebook.com/suprmushrooms"
     ]
   };
@@ -169,6 +168,8 @@ export const Home: React.FC = () => {
             {visibleProducts.map(product => {
               const isOutOfStock = product.stock === 0;
               const isComingSoon = product.status === 'coming_soon';
+              const cartItem = cartContext?.cart.find(item => item.productId === product.id);
+              const quantityInCart = cartItem ? cartItem.quantity : 0;
 
               return (
               <div key={product.id} className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-brand-cream flex flex-col h-full relative">
@@ -178,7 +179,6 @@ export const Home: React.FC = () => {
                   
                   <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   
-                  {/* Coming Soon Badge */}
                   <div className="absolute top-4 left-4 flex flex-col gap-2">
                      {isComingSoon && (
                        <div className="bg-slate-800 text-white text-[10px] font-bold px-3 py-1.5 rounded-full uppercase tracking-wider w-fit shadow-md border border-white/20">
@@ -199,7 +199,6 @@ export const Home: React.FC = () => {
                   
                   <div className="mt-auto pt-4 flex items-center justify-between">
                     <div>
-                      {/* Price / Expected Price */}
                       <span className="text-sm text-brand-muted font-medium">
                         {isComingSoon ? "Expected Price" : "Price"}
                       </span>
@@ -207,19 +206,37 @@ export const Home: React.FC = () => {
                     </div>
                     
                     {!isComingSoon && (
-                      <button 
-                        disabled={isOutOfStock}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (!isOutOfStock) {
-                            cartContext?.addToCart(product, 1);
-                            toast.success(`Added ${product.name} to cart`);
-                          }
-                        }}
-                        className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-brand-brown text-white hover:bg-brand-dark hover:-translate-y-1 shadow-lg shadow-brand-brown/20'}`}
-                      >
-                        <Plus size={20} />
-                      </button>
+                      quantityInCart > 0 ? (
+                        <div className="flex items-center gap-2 bg-brand-brown text-white rounded-xl p-1 shadow-lg shadow-brand-brown/20" onClick={(e) => e.preventDefault()}>
+                           <button 
+                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); cartContext?.updateQuantity(product.id, quantityInCart - 1); }} 
+                             className="w-8 h-8 flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors"
+                           >
+                             <Minus size={16}/>
+                           </button>
+                           <span className="font-bold text-sm w-4 text-center">{quantityInCart}</span>
+                           <button 
+                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); cartContext?.updateQuantity(product.id, quantityInCart + 1); }} 
+                             className="w-8 h-8 flex items-center justify-center hover:bg-white/20 rounded-lg transition-colors"
+                           >
+                             <Plus size={16}/>
+                           </button>
+                        </div>
+                      ) : (
+                        <button 
+                          disabled={isOutOfStock}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (!isOutOfStock) {
+                              cartContext?.addToCart(product, 1);
+                              // NO TOAST HERE - Handled by Context
+                            }
+                          }}
+                          className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${isOutOfStock ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-brand-brown text-white hover:bg-brand-dark hover:-translate-y-1 shadow-lg shadow-brand-brown/20'}`}
+                        >
+                          <Plus size={20} />
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -243,7 +260,6 @@ export const Home: React.FC = () => {
           </p>
           
           <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-24 w-full">
-            {/* Phone */}
             <a href="tel:+918826986127" className="flex items-center gap-4 group no-underline transition-transform hover:scale-105 duration-300">
               <Phone className="w-8 h-8 md:w-10 md:h-10 text-black group-hover:text-[#8b4513] transition-colors duration-300" strokeWidth={2.5} />
               <span className="font-sans font-bold text-2xl md:text-4xl text-black group-hover:text-[#8b4513] transition-colors duration-300">
@@ -251,11 +267,10 @@ export const Home: React.FC = () => {
               </span>
             </a>
 
-            {/* Email */}
-            <a href="mailto:vinaycollege15331@gmail.com" className="flex items-center gap-4 group no-underline transition-transform hover:scale-105 duration-300">
+            <a href="mailto:vinayaggarwal271@gmail.com" className="flex items-center gap-4 group no-underline transition-transform hover:scale-105 duration-300">
               <Mail className="w-8 h-8 md:w-10 md:h-10 text-black group-hover:text-[#8b4513] transition-colors duration-300" strokeWidth={2.5} />
               <span className="font-sans font-bold text-2xl md:text-4xl text-black group-hover:text-[#8b4513] transition-colors duration-300 uppercase">
-                VINAYCOLLEGE15331@GMAIL.COM
+                VINAYAGGARWAL271@GMAIL.COM
               </span>
             </a>
           </div>

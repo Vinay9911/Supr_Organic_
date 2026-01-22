@@ -2,12 +2,15 @@ import React, { createContext, useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { ADMIN_EMAIL } from '../lib/config';
 import { AuthUser } from '../types';
+import toast from 'react-hot-toast';
 
 interface AuthContextType {
   user: AuthUser | null;
   isAdmin: boolean;
   signIn: (email: string, pass: string) => Promise<any>;
   signUp: (email: string, pass: string, name: string) => Promise<any>;
+  signInWithGoogle: () => Promise<any>;
+  resetPassword: (email: string) => Promise<any>;
   signOut: () => Promise<void>;
   loading: boolean;
 }
@@ -46,11 +49,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signIn = (email: string, pass: string) => supabase.auth.signInWithPassword({ email, password: pass });
-  const signUp = (email: string, pass: string, name: string) => supabase.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
-  const signOut = async () => { await supabase.auth.signOut(); };
+  
+  const signUp = async (email: string, pass: string, name: string) => {
+     // NOTE: Supabase default requires email confirmation. 
+     // To disable, go to Supabase Dashboard > Authentication > Providers > Email > Confirm Email (OFF)
+     return supabase.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
+  };
+
+  const signInWithGoogle = async () => {
+    return supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin
+      }
+    });
+  };
+
+  const resetPassword = async (email: string) => {
+    return supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+  };
+
+  const signOut = async () => { 
+    await supabase.auth.signOut(); 
+    toast.success("Logged out successfully");
+  };
 
   return (
-    <AuthContext.Provider value={{ user, isAdmin, signIn, signUp, signOut, loading }}>
+    <AuthContext.Provider value={{ user, isAdmin, signIn, signUp, signInWithGoogle, resetPassword, signOut, loading }}>
       {children}
     </AuthContext.Provider>
   );

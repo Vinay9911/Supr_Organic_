@@ -64,13 +64,13 @@ export const Footer: React.FC = () => {
                </a>
 
                <a 
-                 href="mailto:vinaycollege1531@gmail.com"
+                 href="mailto:vinayaggarwal2711531@gmail.com"
                  className="flex items-center gap-3 bg-black/20 hover:bg-brand-brown transition-colors p-3 rounded-xl text-white group border border-white/10"
                >
                   <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-lg transition-colors">
                     <Mail size={18} />
                   </div>
-                  <span className="text-sm font-medium">vinaycollege1531@gmail.com</span>
+                  <span className="text-sm font-medium">vinayaggarwal271@gmail.com</span>
                </a>
             </div>
           </div>

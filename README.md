@@ -99,7 +99,7 @@ Supr Organic is a next-generation e-commerce platform for selling premium, lab-g
 
 The Admin Dashboard is protected and visible only to specific users.
 * **Admin URL:** `/admin` (or click "Admin" in the Navbar if logged in).
-* **Default Admin Email:** `vinaycollege1531@gmail.com`
+* **Default Admin Email:** `vinayaggarwal271@gmail.com`
     *(To add more admins, update the email check in `src/components/Navbar.tsx`)*.
 
 ---

@@ -1,13 +1,17 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { Product, CartItem } from '../types';
+import { supabase } from '../lib/supabase';
 import toast from 'react-hot-toast';
 
 interface CartContextType {
   cart: CartItem[];
+  isCartOpen: boolean; // Added State
+  setIsCartOpen: (open: boolean) => void; // Added Setter
   addToCart: (product: Product, quantity: number) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
+  validateStock: () => Promise<boolean>;
   total: number;
   cartCount: number;
 }
@@ -16,53 +20,82 @@ export const CartContext = createContext<CartContextType | undefined>(undefined)
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false); // UI State moved here
 
-  // Load cart from localStorage
   useEffect(() => {
     const savedCart = localStorage.getItem('supr_cart');
     if (savedCart) {
-      try {
-        setCart(JSON.parse(savedCart));
-      } catch (e) {
-        console.error("Failed to parse cart", e);
-      }
+      try { setCart(JSON.parse(savedCart)); } catch (e) { console.error(e); }
     }
   }, []);
 
-  // Save cart to localStorage
   useEffect(() => {
     localStorage.setItem('supr_cart', JSON.stringify(cart));
   }, [cart]);
 
+  const validateStock = async (): Promise<boolean> => {
+    let isValid = true;
+    const updatedCart = [...cart];
+    if (updatedCart.length === 0) return true;
+
+    const productIds = cart.map(item => item.productId);
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, stock, name, price, is_deleted')
+      .in('id', productIds);
+
+    if (!products) return true;
+
+    for (let i = 0; i < updatedCart.length; i++) {
+      const item = updatedCart[i];
+      const remoteProduct = products.find(p => p.id === item.productId);
+
+      if (!remoteProduct || remoteProduct.is_deleted) {
+        toast.error(`${item.product.name} is no longer available.`);
+        updatedCart.splice(i, 1);
+        i--;
+        isValid = false;
+        continue;
+      }
+
+      if (remoteProduct.stock < item.quantity) {
+        toast.error(`Stock update: Only ${remoteProduct.stock} left of ${item.product.name}.`);
+        if (remoteProduct.stock === 0) {
+          updatedCart.splice(i, 1);
+          i--;
+        } else {
+          updatedCart[i].quantity = remoteProduct.stock;
+        }
+        isValid = false;
+      }
+      
+      if (remoteProduct.price !== item.product.price) {
+          updatedCart[i].product.price = remoteProduct.price;
+      }
+    }
+
+    if (!isValid) setCart(updatedCart);
+    return isValid;
+  };
+
   const addToCart = (product: Product, quantity: number) => {
-    // 1. Check if we already have this item to calculate total proposed quantity
     const existingItem = cart.find(item => item.productId === product.id);
     const currentQty = existingItem ? existingItem.quantity : 0;
-    const newTotalQty = currentQty + quantity;
-
-    // 2. Validate Stock
-    if (newTotalQty > product.stock) {
-      toast.error(`Sorry, only ${product.stock} units available in stock!`);
+    
+    if (currentQty + quantity > product.stock) {
+      toast.error(`Sorry, only ${product.stock} units available!`);
       return;
     }
 
     setCart(prev => {
-      if (existingItem) {
-        return prev.map(item => 
-          item.productId === product.id 
-            ? { ...item, quantity: newTotalQty }
-            : item
-        );
-      }
-      return [...prev, { 
-        id: product.id, 
-        productId: product.id, 
-        quantity, 
-        product 
-      }];
+      const newList = existingItem
+        ? prev.map(item => item.productId === product.id ? { ...item, quantity: item.quantity + quantity } : item)
+        : [...prev, { id: product.id, productId: product.id, quantity, product }];
+      return newList;
     });
     
-    // Only show success toast if not updating via + button in cart (usually addToCart is from product page)
+    // Feature #6: Open Side Window automatically
+    setIsCartOpen(true);
     toast.success('Added to Cart!');
   };
 
@@ -71,22 +104,17 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const updateQuantity = (productId: string, quantity: number) => {
-    // 1. Handle removal
     if (quantity < 1) {
       removeFromCart(productId);
       return;
     }
-
-    // 2. Find the product to check stock
     const item = cart.find(i => i.productId === productId);
     if (!item) return;
 
-    // 3. Validate Stock
     if (quantity > item.product.stock) {
       toast.error(`Max stock reached (${item.product.stock})`);
       return;
     }
-
     setCart(prev => prev.map(item => item.productId === productId ? { ...item, quantity } : item));
   };
 
@@ -96,7 +124,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const cartCount = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, total, cartCount }}>
+    <CartContext.Provider value={{ 
+      cart, isCartOpen, setIsCartOpen, addToCart, removeFromCart, updateQuantity, clearCart, validateStock, total, cartCount 
+    }}>
       {children}
     </CartContext.Provider>
   );
