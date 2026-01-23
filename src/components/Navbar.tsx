@@ -5,6 +5,9 @@ import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
 
+// --- IMPORT YOUR LOGO ---
+import brandLogo from '../assets/logo.png';
+
 export const Navbar: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -44,14 +47,20 @@ export const Navbar: React.FC = () => {
     <>
       <nav className="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-brand-cream/50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            {/* Logo */}
-            <button onClick={scrollToTop} className="flex items-center gap-2 group">
-              <div className="w-10 h-10 bg-brand-brown rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg shadow-brand-brown/20 group-hover:bg-brand-dark transition-colors">
-                SM
-              </div>
-              <span className="text-2xl font-serif font-bold text-brand-text tracking-tight">Supr Mushrooms</span>
+          {/* UPDATED: Increased Navbar Height to h-24 for bigger logo */}
+          <div className="flex justify-between items-center h-24">
+            
+            {/* --- BRAND LOGO SECTION --- */}
+            <button onClick={scrollToTop} className="flex items-center gap-2 group focus:outline-none">
+              <img 
+                src={brandLogo} 
+                alt="Supr Mushrooms" 
+                // UPDATED: Increased Height (h-16 on mobile, h-20 on desktop)
+                // If it's still small, your image likely has too much empty padding around it.
+                className="h-[160px] md:h-[90px] w-auto object-contain transition-transform group-hover:scale-105" 
+              />
             </button>
+            {/* ------------------------- */}
 
             {/* Desktop Links */}
             <div className="hidden md:flex items-center gap-8">

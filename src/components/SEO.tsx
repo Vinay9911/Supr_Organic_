@@ -17,7 +17,7 @@ export const SEO: React.FC<SEOProps> = ({
   type = 'website',
   schema 
 }) => {
-  const siteTitle = 'Supr Mushrooms | Premium Organic Fungi';
+  const siteTitle = 'Supr Mushrooms | Premium Lab-Grown Fungi';
   const finalTitle = title === siteTitle ? title : `${title} | Supr Mushrooms`;
   const defaultImage = 'https://images.unsplash.com/photo-1595503426955-d6c561491714'; // Fallback image
 

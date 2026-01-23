@@ -4,9 +4,26 @@ import { ArrowRight, Cpu, ShieldCheck, Leaf, Plus, Minus, Loader2, Truck, Sparkl
 import { CartContext } from '../context/CartContext';
 import { DataContext } from '../context/DataContext';
 import { SEO } from '../components/SEO';
-import toast from 'react-hot-toast';
+import { motion } from 'framer-motion'; // Import Framer Motion
 
-import heroImg from '../assets/hero-image.png'; 
+// --- IMPORT YOUR GIF HERE ---
+import heroGif from '../assets/hero-animation.gif'; 
+
+// Animation Variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
 
 export const Home: React.FC = () => {
   const cartContext = useContext(CartContext);
@@ -37,7 +54,7 @@ export const Home: React.FC = () => {
     "name": "Supr Mushrooms",
     "url": window.location.origin,
     "logo": "https://suprmushrooms.com/logo.png",
-    "description": "Premium aeroponic saffron and scientifically farmed organic mushrooms in Delhi NCR.",
+    "description": "Scientifically farmed premium mushrooms in Delhi NCR. 100% Natural, Chemical-free, and delivered fresh.",
     "contactPoint": {
       "@type": "ContactPoint",
       "telephone": "+91-8826986127",
@@ -54,117 +71,136 @@ export const Home: React.FC = () => {
   return (
     <div className="pb-0 bg-brand-light">
       <SEO 
-        title="Fresh Aeroponic Mushrooms & Saffron Delhi" 
-        description="Buy fresh Oyster, Shiitake mushrooms and Aeroponic Saffron in Delhi NCR. 100% Organic, Chemical-free, and delivered farm-to-table in 24 hours."
+        title="Fresh Lab-Grown Mushrooms Delhi" 
+        description="Buy fresh Oyster and Shiitake mushrooms in Delhi NCR. Grown in sterile environments, chemical-free, and delivered farm-to-table in 24 hours."
         schema={organizationSchema}
       />
 
       {/* Hero Section */}
       <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-gradient-to-br from-brand-light via-brand-cream to-brand-darkCream pt-20">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 md:pt-32 pb-20 grid md:grid-cols-2 gap-12 items-center">
-          <div className="space-y-8 animate-in fade-in slide-in-from-left-10 duration-1000 z-10">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-brown/10 rounded-full border border-brand-brown/20">
+          
+          {/* Animated Text Content */}
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={staggerContainer}
+            className="space-y-8 z-10"
+          >
+            <motion.div variants={fadeInUp} className="inline-flex items-center gap-2 px-4 py-1.5 bg-brand-brown/10 rounded-full border border-brand-brown/20">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-brown opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-brand-brown"></span>
               </span>
-              <span className="text-xs font-bold text-brand-brown uppercase tracking-widest">Premium Organic Harvest</span>
-            </div>
+              <span className="text-xs font-bold text-brand-brown uppercase tracking-widest">Premium Fresh Harvest</span>
+            </motion.div>
             
-            <h1 className="text-5xl md:text-7xl font-serif font-bold text-brand-text leading-[1.1]">
-              Taste the <br />
-              <span className="text-brand-brown italic">Earth's Magic.</span>
-            </h1>
+            <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl font-serif font-bold text-brand-text leading-[1.1]">
+              Pure Nutrition. <br />
+              <span className="text-brand-brown italic">Untouched by Toxins.</span>
+            </motion.h1>
             
-            <p className="text-lg text-brand-muted max-w-lg leading-relaxed">
-              Experience the rich, earthy flavors of scientifically farmed mushrooms. Grown with care, delivered fresh within hours in Delhi NCR.
-            </p>
+            <motion.p variants={fadeInUp} className="text-lg text-brand-muted max-w-lg leading-relaxed">
+              Forget store-bought. Eat mushrooms as nature intended—grown in sterile environments without heavy metals or chemicals. Fresh from our farms to your plates.
+            </motion.p>
             
-            <div className="flex flex-wrap gap-4">
+            <motion.div variants={fadeInUp} className="flex flex-wrap gap-4">
               <button onClick={() => document.getElementById('shop')?.scrollIntoView({behavior: 'smooth'})} className="bg-brand-brown text-white px-8 py-4 rounded-full font-bold text-lg hover:bg-brand-dark hover:shadow-lg hover:shadow-brand-brown/30 transition-all flex items-center gap-2 group">
                 Shop Fresh <ArrowRight className="group-hover:translate-x-1 transition-transform" />
               </button>
-            </div>
+            </motion.div>
             
-            <div className="grid grid-cols-3 gap-8 pt-8 border-t border-brand-brown/10">
-              <div><div className="text-3xl font-serif font-bold text-brand-text">100%</div><div className="text-xs text-brand-muted uppercase tracking-wider font-bold">Organic</div></div>
+            <motion.div variants={fadeInUp} className="grid grid-cols-3 gap-8 pt-8 border-t border-brand-brown/10">
+              <div><div className="text-3xl font-serif font-bold text-brand-text">100%</div><div className="text-xs text-brand-muted uppercase tracking-wider font-bold">Natural</div></div>
               <div><div className="text-3xl font-serif font-bold text-brand-text">0%</div><div className="text-xs text-brand-muted uppercase tracking-wider font-bold">Soil Use</div></div>
-              <div><div className="text-3xl font-serif font-bold text-brand-text">2h</div><div className="text-xs text-brand-muted uppercase tracking-wider font-bold">Delivery</div></div>
-            </div>
-          </div>
+              <div><div className="text-3xl font-serif font-bold text-brand-text">0%</div><div className="text-xs text-brand-muted uppercase tracking-wider font-bold">Pesticides</div></div>
+            </motion.div>
+          </motion.div>
 
-          <div className="relative z-10 hidden md:block animate-in fade-in slide-in-from-right-10 duration-1000 delay-200">
-             <div className="absolute inset-0 bg-brand-cream/50 blur-[80px] rounded-full"></div>
+          {/* Animated GIF Image */}
+          <motion.div 
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="relative z-10 hidden md:block"
+          >
+             <div className="absolute inset-0 bg-brand-cream/40 blur-[90px] rounded-full transform translate-x-10"></div>
              <img 
-               src={heroImg} 
-               alt="Fresh Mushrooms" 
-               className="relative w-full h-auto object-cover rounded-[2rem] shadow-2xl border-4 border-white rotate-2 hover:rotate-0 transition-all duration-500"
+               src={heroGif} 
+               alt="Fresh Mushrooms Animation" 
+               className="relative w-[115%] h-auto max-w-none object-contain scale-125 translate-x-10 drop-shadow-2xl"
              />
-          </div>
+          </motion.div>
         </div>
       </section>
 
       {/* Features Section */}
       <section id="labs" className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4">
-           <div className="text-center mb-16">
+           <motion.div 
+             initial="hidden"
+             whileInView="visible"
+             viewport={{ once: true }}
+             variants={fadeInUp}
+             className="text-center mb-16"
+           >
             <h2 className="text-sm font-bold text-brand-brown uppercase tracking-widest mb-3">Our Process</h2>
             <h3 className="text-3xl md:text-5xl font-serif font-bold text-brand-text mb-6">Farming for the Future</h3>
             <p className="text-brand-muted max-w-2xl mx-auto">
               Our mushrooms are grown in clean-room environments using sterilized high-grade substrates. No pesticides. No heavy metals. Just pure nutrition.
             </p>
-          </div>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
-              <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><Cpu size={28} /></div>
-              <h4 className="text-xl font-bold mb-4 text-brand-text">Precision Monitoring</h4>
-              <p className="text-brand-muted text-sm leading-relaxed">IoT sensors monitor temperature and humidity 24/7 to mimic the perfect forest floor environment.</p>
-            </div>
-            
-            <div className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
-              <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><ShieldCheck size={28} /></div>
-              <h4 className="text-xl font-bold mb-4 text-brand-text">Zero Contamination</h4>
-              <p className="text-brand-muted text-sm leading-relaxed">HEPA-filtered air and strict entry protocols mean our produce is cleaner than traditional soil farms.</p>
-            </div>
+          </motion.div>
 
-            <div className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
-              <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><Truck size={28} /></div>
-              <h4 className="text-xl font-bold mb-4 text-brand-text">Fast Delivery</h4>
-              <p className="text-brand-muted text-sm leading-relaxed">Fresh mushrooms delivered within 24-48 hours to ensure maximum freshness.</p>
-            </div>
-
-            <div className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
-              <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><Sparkles size={28} /></div>
-              <h4 className="text-xl font-bold mb-4 text-brand-text">Premium Quality</h4>
-              <p className="text-brand-muted text-sm leading-relaxed">Hand-picked, farm-fresh mushrooms meeting the highest quality standards.</p>
-            </div>
-
-            <div className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
-              <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><Leaf size={28} /></div>
-              <h4 className="text-xl font-bold mb-4 text-brand-text">100% Organic</h4>
-              <p className="text-brand-muted text-sm leading-relaxed">Grown naturally without harmful chemicals or pesticides.</p>
-            </div>
-
-            <div className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
-              <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><DollarSign size={28} /></div>
-              <h4 className="text-xl font-bold mb-4 text-brand-text">Best Prices</h4>
-              <p className="text-brand-muted text-sm leading-relaxed">Competitive pricing with regular discounts and offers.</p>
-            </div>
-          </div>
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-50px" }}
+            variants={staggerContainer}
+            className="grid md:grid-cols-3 gap-8"
+          >
+            {[
+              { icon: Cpu, title: "Precision Monitoring", desc: "IoT sensors monitor temperature and humidity 24/7 to mimic the perfect forest floor environment." },
+              { icon: ShieldCheck, title: "Zero Contamination", desc: "HEPA-filtered air and strict entry protocols mean our produce is cleaner than traditional soil farms." },
+              { icon: Truck, title: "Fast Delivery", desc: "Fresh mushrooms delivered within 24-48 hours to ensure maximum freshness." },
+              { icon: Sparkles, title: "Premium Quality", desc: "Hand-picked, farm-fresh mushrooms meeting the highest quality standards." },
+              { icon: Leaf, title: "100% Natural", desc: "Grown naturally without harmful chemicals or pesticides." },
+              { icon: DollarSign, title: "Best Prices", desc: "Competitive pricing with regular discounts and offers." }
+            ].map((feature, idx) => (
+              <motion.div key={idx} variants={fadeInUp} className="p-8 bg-brand-light rounded-3xl border border-brand-cream hover:bg-brand-cream hover:shadow-xl transition-all duration-300 group cursor-default">
+                <div className="w-14 h-14 bg-brand-brown rounded-2xl flex items-center justify-center text-white mb-6 group-hover:scale-110 transition-transform"><feature.icon size={28} /></div>
+                <h4 className="text-xl font-bold mb-4 text-brand-text">{feature.title}</h4>
+                <p className="text-brand-muted text-sm leading-relaxed">{feature.desc}</p>
+              </motion.div>
+            ))}
+          </motion.div>
         </div>
       </section>
 
       {/* Shop Section */}
       <section id="shop" className="pt-24 pb-24 bg-brand-light">
         <div className="max-w-7xl mx-auto px-4">
-          <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+          <motion.div 
+            initial="hidden" 
+            whileInView="visible" 
+            viewport={{ once: true }} 
+            variants={fadeInUp} 
+            className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6"
+          >
             <div>
               <h2 className="text-sm font-bold text-brand-green uppercase tracking-widest mb-3">Fresh Harvest</h2>
               <h3 className="text-3xl md:text-5xl font-serif font-bold text-brand-text">Our Products</h3>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <motion.div 
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true }}
+            variants={staggerContainer}
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8"
+          >
             {visibleProducts.map(product => {
               const isOutOfStock = product.stock === 0;
               const isComingSoon = product.status === 'coming_soon';
@@ -172,7 +208,7 @@ export const Home: React.FC = () => {
               const quantityInCart = cartItem ? cartItem.quantity : 0;
 
               return (
-              <div key={product.id} className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-brand-cream flex flex-col h-full relative">
+              <motion.div variants={fadeInUp} key={product.id} className="group bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-brand-cream flex flex-col h-full relative">
                 <Link to={`/product/${product.id}`} className="block relative aspect-square overflow-hidden cursor-pointer">
                   
                   {isOutOfStock && !isComingSoon && <div className="absolute inset-0 bg-white/60 z-10 flex items-center justify-center"><span className="bg-brand-text text-white px-4 py-2 rounded-full font-bold text-sm">Out of Stock</span></div>}
@@ -240,9 +276,9 @@ export const Home: React.FC = () => {
                     )}
                   </div>
                 </div>
-              </div>
+              </motion.div>
             )})}
-          </div>
+          </motion.div>
         </div>
       </section>
 
