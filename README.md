@@ -2,7 +2,11 @@
 
 A modern, full-stack e-commerce platform for selling premium lab-grown mushrooms and organic products. Built with React, TypeScript, Supabase, and Tailwind CSS.
 
-![Supr Mushrooms](https://images.unsplash.com/photo-1595503426955-d6c561491714?w=1200&h=400&fit=crop)
+🚀TRY IT NOW: [https://supr-mushroom.vercel.app](https://supr-mushroom.vercel.app/)
+
+
+<img width="1724" height="1068" alt="Screenshot 2026-01-23 174248" src="https://github.com/user-attachments/assets/5a60143b-4c17-4174-8492-fafca21ba612" />
+
 
 ## 🌟 Features
 
