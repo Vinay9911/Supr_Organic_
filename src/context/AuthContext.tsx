@@ -51,8 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = (email: string, pass: string) => supabase.auth.signInWithPassword({ email, password: pass });
   
   const signUp = async (email: string, pass: string, name: string) => {
-     // NOTE: Supabase default requires email confirmation. 
-     // To disable, go to Supabase Dashboard > Authentication > Providers > Email > Confirm Email (OFF)
+     
      return supabase.auth.signUp({ email, password: pass, options: { data: { full_name: name } } });
   };
 
