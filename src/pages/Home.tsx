@@ -129,10 +129,10 @@ export const Home: React.FC = () => {
           >
              <div className="absolute inset-0 bg-brand-cream/40 blur-[60px] md:blur-[90px] rounded-full transform translate-x-4 md:translate-x-10"></div>
              <img 
-               src={heroGif} 
-               alt="Fresh Mushrooms Animation" 
-               className="relative w-[80%] md:w-[115%] h-auto max-w-[300px] md:max-w-none mx-auto md:mx-0 object-contain md:scale-125 md:translate-x-10 drop-shadow-2xl"
-             />
+  src={heroGif} 
+  alt="Fresh Mushrooms Animation" 
+  className="relative w-[80%] md:w-[115%] h-auto max-w-[300px] md:max-w-none mx-auto md:mx-0 object-contain md:scale-125 md:translate-x-10"
+/>
           </motion.div>
         </div>
       </section>
