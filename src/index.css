@@ -8,8 +8,40 @@
   font-weight: 400;
 }
 
+/* Global Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+  /* FIXED: Prevent horizontal scroll */
+  overflow-x: hidden;
+  width: 100%;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  /* FIXED: Prevent horizontal scroll issues on mobile */
+  overflow-x: hidden; 
+  width: 100%;
+  position: relative;
+}
+
+#root {
+  overflow-x: hidden;
+  width: 100%;
+}
+
+/* --- UTILITY CLASSES TO HIDE SCROLLBARS --- */
+@layer utilities {
+  /* Chrome, Safari and Opera */
+  .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+  }
+
+  /* IE and Edge */
+  .scrollbar-hide {
+      -ms-overflow-style: none;
+      /* Firefox */
+      scrollbar-width: none;
+  }
 }

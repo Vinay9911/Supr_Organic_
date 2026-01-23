@@ -1,6 +1,6 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, Menu, X, User, LayoutDashboard, Heart } from 'lucide-react';
+import { ShoppingBag, Menu, X, User, LayoutDashboard, Heart, Home, Store, LogOut, ChevronRight } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
@@ -16,6 +16,15 @@ export const Navbar: React.FC = () => {
   const { user, isAdmin, signOut } = useContext(AuthContext)!;
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Lock body scroll when menu is open
+  useEffect(() => {
+    if (isMenuOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = 'unset';
+    }
+  }, [isMenuOpen]);
 
   const handleCartClick = () => {
     cartContext?.setIsCartOpen(true);
@@ -47,20 +56,17 @@ export const Navbar: React.FC = () => {
     <>
       <nav className="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-brand-cream/50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* UPDATED: Increased Navbar Height to h-24 for bigger logo */}
-          <div className="flex justify-between items-center h-24">
+          <div className="flex justify-between items-center h-20 md:h-24">
             
             {/* --- BRAND LOGO SECTION --- */}
-            <button onClick={scrollToTop} className="flex items-center gap-2 group focus:outline-none">
+            <button onClick={scrollToTop} className="flex items-center gap-2 group focus:outline-none shrink-0">
               <img 
                 src={brandLogo} 
                 alt="Supr Mushrooms" 
-                // UPDATED: Increased Height (h-16 on mobile, h-20 on desktop)
-                // If it's still small, your image likely has too much empty padding around it.
-                className="h-[160px] md:h-[90px] w-auto object-contain transition-transform group-hover:scale-105" 
+                // FIXED: Changed h-[160px] to h-10 for mobile so it doesn't break the header
+                className="h-10 md:h-20 w-auto object-contain transition-transform group-hover:scale-105" 
               />
             </button>
-            {/* ------------------------- */}
 
             {/* Desktop Links */}
             <div className="hidden md:flex items-center gap-8">
@@ -105,9 +111,9 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
 
-            {/* Mobile Menu Button */}
-            <div className="md:hidden flex items-center gap-4">
-               <button onClick={handleCartClick} className="relative p-2 text-brand-text">
+            {/* Mobile Actions (Cart + Menu Toggle) */}
+            <div className="md:hidden flex items-center gap-3">
+               <button onClick={handleCartClick} className="relative p-2 text-brand-text hover:text-brand-brown transition-colors">
                 <ShoppingBag size={24} />
                 {cartContext && cartContext.cartCount > 0 && (
                   <span className="absolute -top-1 -right-1 w-5 h-5 bg-brand-green text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
@@ -115,30 +121,95 @@ export const Navbar: React.FC = () => {
                   </span>
                 )}
               </button>
-              <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-brand-text">
-                {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+              <button 
+                onClick={() => setIsMenuOpen(true)} 
+                className="p-2 text-brand-text hover:bg-brand-light rounded-full transition-colors"
+              >
+                <Menu size={28} />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Mobile Menu */}
-        {isMenuOpen && (
-          <div className="md:hidden bg-brand-light border-t border-brand-cream p-4 space-y-4 animate-in slide-in-from-top-5">
-            <button onClick={scrollToTop} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Home</button>
-            <button onClick={() => scrollToSection('shop')} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Shop</button>
-            <Link to="/wishlist" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-muted font-medium w-full text-left hover:text-brand-brown">Wishlist</Link>
-            {user ? (
-               <>
-                 <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-text font-bold">My Orders</Link>
-                 {isAdmin && <Link to="/admin" onClick={()=>setIsMenuOpen(false)} className="block py-2 text-brand-brown font-bold">Admin Dashboard</Link>}
-                 <button onClick={()=>{signOut(); setIsMenuOpen(false)}} className="block py-2 text-red-500 font-medium w-full text-left">Logout</button>
-               </>
-            ) : (
-               <button onClick={()=>{setIsAuthOpen(true); setIsMenuOpen(false)}} className="block py-2 text-brand-brown font-bold w-full text-left">Login / Signup</button>
-            )}
+        {/* --- MODERN MOBILE MENU (SIDE DRAWER) --- */}
+        <div 
+          className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+            isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+          onClick={() => setIsMenuOpen(false)}
+        />
+
+        {/* Drawer Panel */}
+        <div 
+          className={`fixed top-0 right-0 z-[70] h-full w-[85%] max-w-[320px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${
+            isMenuOpen ? 'translate-x-0' : 'translate-x-full'
+          }`}
+        >
+          <div className="flex flex-col h-full">
+            {/* Drawer Header */}
+            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+              <span className="text-xl font-serif font-bold text-brand-text">Menu</span>
+              <button 
+                onClick={() => setIsMenuOpen(false)}
+                className="p-2 -mr-2 text-brand-muted hover:text-brand-text hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Drawer Content */}
+            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
+              <button onClick={scrollToTop} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+                <Home size={20} className="text-brand-muted group-hover:text-brand-brown"/>
+                <span className="font-medium text-lg">Home</span>
+              </button>
+              
+              <button onClick={() => scrollToSection('shop')} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+                <Store size={20} className="text-brand-muted group-hover:text-brand-brown"/>
+                <span className="font-medium text-lg">Shop</span>
+              </button>
+              
+              <Link to="/wishlist" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+                <Heart size={20} className="text-brand-muted group-hover:text-brand-brown"/>
+                <span className="font-medium text-lg">Wishlist</span>
+              </Link>
+
+              {user && (
+                 <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+                   <ShoppingBag size={20} className="text-brand-muted group-hover:text-brand-brown"/>
+                   <span className="font-medium text-lg">My Orders</span>
+                 </Link>
+              )}
+
+              {user && isAdmin && (
+                <Link to="/admin" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-4 rounded-xl bg-brand-light/50 text-brand-brown hover:bg-brand-light transition-colors">
+                   <LayoutDashboard size={20}/>
+                   <span className="font-bold text-lg">Admin Dashboard</span>
+                </Link>
+              )}
+            </div>
+
+            {/* Drawer Footer */}
+            <div className="p-6 border-t border-gray-100 bg-gray-50/50">
+              {user ? (
+                 <button 
+                   onClick={()=>{signOut(); setIsMenuOpen(false)}} 
+                   className="flex items-center justify-between w-full p-4 rounded-xl bg-red-50 text-red-600 font-bold hover:bg-red-100 transition-colors"
+                 >
+                   <span className="flex items-center gap-2"><LogOut size={18}/> Logout</span>
+                 </button>
+              ) : (
+                 <button 
+                   onClick={()=>{setIsAuthOpen(true); setIsMenuOpen(false)}} 
+                   className="flex items-center justify-between w-full p-4 rounded-xl bg-brand-brown text-white font-bold hover:bg-brand-dark shadow-lg shadow-brand-brown/20 transition-all"
+                 >
+                   <span className="flex items-center gap-2"><User size={18}/> Login / Signup</span>
+                   <ChevronRight size={18} />
+                 </button>
+              )}
+            </div>
           </div>
-        )}
+        </div>
       </nav>
 
       <AuthModal isOpen={isAuthOpen} onClose={() => setIsAuthOpen(false)} />

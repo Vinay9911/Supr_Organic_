@@ -17,16 +17,12 @@ export const Footer: React.FC = () => {
   };
 
   return (
-    <footer className="bg-brand-dark text-brand-cream py-16 px-4 sm:px-6 lg:px-8 mt-auto border-t border-brand-brown/30 relative z-10">
+    <footer className="bg-brand-dark text-brand-cream py-16 px-4 sm:px-6 lg:px-8 mt-auto border-t border-brand-brown/30 relative z-10 overflow-hidden">
       <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8 text-center md:text-left">
         
         {/* Brand Column (Logo) */}
         <div className="col-span-1 flex flex-col items-center md:items-start">
           <div className="mb-6">
-            {/* UPDATED: 
-                1. -mt-10 md:-mt-16: Shifts logo much higher up.
-                2. h-[90px] md:h-[130px]: Optimized size.
-            */}
             <img 
               src={brandLogo} 
               alt="Supr Mushrooms" 
@@ -39,7 +35,6 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Shop Column */}
-        {/* UPDATED: Added pt-8 md:pt-12 to shift content down */}
         <div className="flex flex-col items-center md:items-start pt-8 md:pt-12">
           <h4 className="text-white font-serif font-bold text-xl mb-6">Explore</h4>
           <ul className="space-y-4 text-sm text-brand-cream/80 w-full">
@@ -57,7 +52,6 @@ export const Footer: React.FC = () => {
         </div>
 
         {/* Connect Column */}
-        {/* UPDATED: Added pt-8 md:pt-12 to shift content down */}
         <div className="flex flex-col items-center md:items-start pt-8 md:pt-12">
           <h4 className="text-white font-serif font-bold text-xl mb-6">Contact Us</h4>
           <div className="flex flex-col gap-4 w-full max-w-xs md:max-w-none">
@@ -80,7 +74,8 @@ export const Footer: React.FC = () => {
                 <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-lg transition-colors">
                   <Mail size={18} />
                 </div>
-                <span className="text-sm font-medium">vinayaggarwal271@gmail.com</span>
+                {/* FIXED: Added break-all to allow email to wrap on mobile */}
+                <span className="text-sm font-medium break-all text-left">vinayaggarwal271@gmail.com</span>
              </a>
           </div>
         </div>
