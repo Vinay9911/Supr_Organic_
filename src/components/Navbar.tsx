@@ -4,8 +4,6 @@ import { ShoppingBag, Menu, X, User, LayoutDashboard, Heart, Home, Store, LogOut
 import { CartContext } from '../context/CartContext';
 import { AuthContext } from '../context/AuthContext';
 import { AuthModal } from './AuthModal';
-
-// --- IMPORT YOUR LOGO ---
 import brandLogo from '../assets/logo.png';
 
 export const Navbar: React.FC = () => {
@@ -54,7 +52,7 @@ export const Navbar: React.FC = () => {
 
   return (
     <>
-      <nav className="fixed w-full z-50 bg-white/90 backdrop-blur-md border-b border-brand-cream/50 transition-all duration-300">
+      <nav className="fixed w-full z-50 bg-white border-b border-brand-cream/50 transition-all duration-300">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20 md:h-24">
             
@@ -63,7 +61,6 @@ export const Navbar: React.FC = () => {
               <img 
                 src={brandLogo} 
                 alt="Supr Mushrooms" 
-                // FIXED: Changed h-[160px] to h-10 for mobile so it doesn't break the header
                 className="h-10 md:h-20 w-auto object-contain transition-transform group-hover:scale-105" 
               />
             </button>
@@ -104,7 +101,7 @@ export const Navbar: React.FC = () => {
               >
                 <ShoppingBag size={20} />
                 {cartContext && cartContext.cartCount > 0 && (
-                  <span className="absolute top-0 right-0 w-5 h-5 bg-brand-green text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white shadow-sm">
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-brand-green text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white shadow-sm">
                     {cartContext.cartCount}
                   </span>
                 )}
@@ -131,23 +128,23 @@ export const Navbar: React.FC = () => {
           </div>
         </div>
 
-        {/* --- MODERN MOBILE MENU (SIDE DRAWER) --- */}
+        {/* --- MOBILE DRAWER MENU --- */}
         <div 
-          className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 md:hidden ${
+          className={`fixed inset-0 z-[60] bg-black/50 transition-opacity duration-300 md:hidden ${
             isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
           }`}
           onClick={() => setIsMenuOpen(false)}
         />
 
-        {/* Drawer Panel */}
+        {/* Drawer Panel - FIXED: Solid bg-white, increased z-index */}
         <div 
           className={`fixed top-0 right-0 z-[70] h-full w-[85%] max-w-[320px] bg-white shadow-2xl transform transition-transform duration-300 ease-in-out md:hidden ${
             isMenuOpen ? 'translate-x-0' : 'translate-x-full'
           }`}
         >
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full bg-white">
             {/* Drawer Header */}
-            <div className="flex justify-between items-center p-6 border-b border-gray-100">
+            <div className="flex justify-between items-center p-5 border-b border-gray-100 bg-white">
               <span className="text-xl font-serif font-bold text-brand-text">Menu</span>
               <button 
                 onClick={() => setIsMenuOpen(false)}
@@ -157,32 +154,32 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
 
-            {/* Drawer Content */}
-            <div className="flex-1 overflow-y-auto py-6 px-4 space-y-2">
-              <button onClick={scrollToTop} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+            {/* Drawer Content - FIXED: Reduced padding (p-3) so items fit on screen */}
+            <div className="flex-1 overflow-y-auto py-4 px-4 space-y-2 bg-white">
+              <button onClick={scrollToTop} className="flex items-center gap-4 w-full p-3 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
                 <Home size={20} className="text-brand-muted group-hover:text-brand-brown"/>
                 <span className="font-medium text-lg">Home</span>
               </button>
               
-              <button onClick={() => scrollToSection('shop')} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+              <button onClick={() => scrollToSection('shop')} className="flex items-center gap-4 w-full p-3 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
                 <Store size={20} className="text-brand-muted group-hover:text-brand-brown"/>
                 <span className="font-medium text-lg">Shop</span>
               </button>
               
-              <Link to="/wishlist" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+              <Link to="/wishlist" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-3 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
                 <Heart size={20} className="text-brand-muted group-hover:text-brand-brown"/>
                 <span className="font-medium text-lg">Wishlist</span>
               </Link>
 
               {user && (
-                 <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-4 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
+                 <Link to="/orders" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-3 rounded-xl text-brand-text hover:bg-brand-light transition-colors group">
                    <ShoppingBag size={20} className="text-brand-muted group-hover:text-brand-brown"/>
                    <span className="font-medium text-lg">My Orders</span>
                  </Link>
               )}
 
               {user && isAdmin && (
-                <Link to="/admin" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-4 rounded-xl bg-brand-light/50 text-brand-brown hover:bg-brand-light transition-colors">
+                <Link to="/admin" onClick={()=>setIsMenuOpen(false)} className="flex items-center gap-4 w-full p-3 rounded-xl bg-brand-light/50 text-brand-brown hover:bg-brand-light transition-colors">
                    <LayoutDashboard size={20}/>
                    <span className="font-bold text-lg">Admin Dashboard</span>
                 </Link>
@@ -190,7 +187,7 @@ export const Navbar: React.FC = () => {
             </div>
 
             {/* Drawer Footer */}
-            <div className="p-6 border-t border-gray-100 bg-gray-50/50">
+            <div className="p-5 border-t border-gray-100 bg-white">
               {user ? (
                  <button 
                    onClick={()=>{signOut(); setIsMenuOpen(false)}} 
