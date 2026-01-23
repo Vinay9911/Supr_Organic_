@@ -11,6 +11,7 @@ import { Footer } from './components/Footer';
 import { Chatbot } from './components/Chatbot'; 
 import { AuthModal } from './components/AuthModal'; 
 import { CheckoutModal } from './components/CheckoutModal'; 
+import { ResetPassword } from './pages/ResetPassword';
 
 // Pages
 import { Home } from './pages/Home';
@@ -71,6 +72,7 @@ const AppContent: React.FC = () => {
           <Route path="/wishlist" element={<Wishlist />} /> 
           <Route path="/chef" element={<AIChef />} />
           <Route path="/admin" element={auth?.isAdmin ? <AdminDashboard /> : <Home />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Routes>
       </main>
 
