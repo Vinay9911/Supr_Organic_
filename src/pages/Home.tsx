@@ -1,8 +1,9 @@
 import React, { useContext, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { ArrowRight, Cpu, ShieldCheck, Leaf, Plus, Minus, Loader2, Truck, Sparkles, DollarSign, Phone, Mail } from 'lucide-react';
+import { ArrowRight, Cpu, ShieldCheck, Leaf, Plus, Minus, Loader2, Truck, Sparkles, DollarSign, Phone, Mail, Heart } from 'lucide-react';
 import { CartContext } from '../context/CartContext';
 import { DataContext } from '../context/DataContext';
+import { WishlistContext } from '../context/WishlistContext';
 import { SEO } from '../components/SEO';
 import { motion } from 'framer-motion'; 
 
@@ -28,6 +29,7 @@ const staggerContainer = {
 export const Home: React.FC = () => {
   const cartContext = useContext(CartContext);
   const dataContext = useContext(DataContext);
+  const wishlistContext = useContext(WishlistContext);
   const { products, loading } = dataContext!;
   const location = useLocation();
 
@@ -68,8 +70,17 @@ export const Home: React.FC = () => {
     ]
   };
 
+  const handleWishlistToggle = (e: React.MouseEvent, productId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (wishlistContext?.isInWishlist(productId)) {
+      wishlistContext.removeFromWishlist(productId);
+    } else {
+      wishlistContext?.addToWishlist(productId);
+    }
+  };
+
   return (
-    // Added overflow-x-hidden to prevent horizontal scroll
     <div className="pb-0 bg-brand-light w-full overflow-x-hidden">
       <SEO 
         title="Fresh Lab-Grown Mushrooms Delhi" 
@@ -119,7 +130,7 @@ export const Home: React.FC = () => {
             </motion.div>
           </motion.div>
 
-          {/* Animated GIF Image (FIXED: Removed 'hidden' class on mobile) */}
+          {/* Animated GIF Image */}
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
@@ -127,9 +138,7 @@ export const Home: React.FC = () => {
             transition={{ duration: 0.8 }}
             className="relative z-10 order-2 md:order-2 mt-8 md:mt-0 flex justify-center"
           >
-             {/* Gradient glow */}
              <div className="absolute inset-0 bg-brand-cream/40 blur-[60px] md:blur-[90px] rounded-full transform translate-x-4 md:translate-x-10"></div>
-             {/* FIXED: Adjusted width constraints so it doesn't overflow */}
              <img 
                src={heroGif} 
                alt="Fresh Mushrooms Animation" 
@@ -209,6 +218,7 @@ export const Home: React.FC = () => {
               const isComingSoon = product.status === 'coming_soon';
               const cartItem = cartContext?.cart.find(item => item.productId === product.id);
               const quantityInCart = cartItem ? cartItem.quantity : 0;
+              const isWishlisted = wishlistContext?.isInWishlist(product.id);
 
               return (
               <motion.div variants={fadeInUp} key={product.id} className="group bg-white rounded-2xl md:rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all duration-500 border border-brand-cream flex flex-col h-full relative">
@@ -218,13 +228,22 @@ export const Home: React.FC = () => {
                   
                   <img src={product.images[0]} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                   
-                  <div className="absolute top-2 left-2 md:top-4 md:left-4 flex flex-col gap-2">
+                  {/* Tags */}
+                  <div className="absolute top-2 left-2 md:top-4 md:left-4 flex flex-col gap-2 z-10">
                      {isComingSoon && (
                        <div className="bg-slate-800 text-white text-[8px] md:text-[10px] font-bold px-2 py-1 md:px-3 md:py-1.5 rounded-full uppercase tracking-wider w-fit shadow-md border border-white/20">
                          Coming Soon
                        </div>
                      )}
                   </div>
+
+                  {/* Wishlist Button */}
+                  <button 
+                    onClick={(e) => handleWishlistToggle(e, product.id)}
+                    className="absolute top-2 right-2 md:top-4 md:right-4 p-2 bg-white/80 hover:bg-white backdrop-blur-sm rounded-full shadow-sm z-20 text-brand-brown transition-all hover:scale-110"
+                  >
+                    <Heart size={18} fill={isWishlisted ? "currentColor" : "none"} />
+                  </button>
                 </Link>
 
                 <div className="p-3 md:p-6 flex flex-col flex-grow">
@@ -307,8 +326,8 @@ export const Home: React.FC = () => {
 
             <a href="mailto:vinayaggarwal271@gmail.com" className="flex items-center gap-3 md:gap-4 group no-underline transition-transform hover:scale-105 duration-300 max-w-[90vw]">
               <Mail className="w-6 h-6 md:w-10 md:h-10 text-black group-hover:text-[#8b4513] transition-colors duration-300 shrink-0" strokeWidth={2.5} />
-              {/* FIXED: Added 'break-all' to ensure the email wraps on small screens */}
-              <span className="font-sans font-bold text-xl md:text-4xl text-black group-hover:text-[#8b4513] transition-colors duration-300 uppercase break-all text-left">
+              {/* FIXED: Reduced font size to text-[10px] on mobile to fit the long email without breaking lines or layout */}
+              <span className="font-sans font-bold text-[10px] sm:text-lg md:text-4xl text-black group-hover:text-[#8b4513] transition-colors duration-300 uppercase text-left">
                 VINAYAGGARWAL271@GMAIL.COM
               </span>
             </a>

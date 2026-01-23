@@ -1,5 +1,5 @@
 import React from 'react';
-import { Mail, Phone } from 'lucide-react';
+import { Mail, Phone, MessageCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 // --- IMPORT YOUR LOGO ---
@@ -51,14 +51,13 @@ export const Footer: React.FC = () => {
           </ul>
         </div>
 
-        {/* Connect Column */}
+        {/* Contact Column */}
         <div className="flex flex-col items-center md:items-start pt-8 md:pt-12">
           <h4 className="text-white font-serif font-bold text-xl mb-6">Contact Us</h4>
           <div className="flex flex-col gap-4 w-full max-w-xs md:max-w-none">
+             {/* Option 1: Phone */}
              <a 
-               href="https://wa.me/918826986127" 
-               target="_blank" 
-               rel="noreferrer"
+               href="tel:+918826986127" 
                className="flex items-center gap-3 bg-black/20 hover:bg-brand-brown transition-colors p-3 rounded-xl text-white group border border-white/10 justify-center md:justify-start"
              >
                 <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-lg transition-colors">
@@ -67,6 +66,7 @@ export const Footer: React.FC = () => {
                 <span className="text-sm font-medium">+91 8826986127</span>
              </a>
 
+             {/* Option 2: Email */}
              <a 
                href="mailto:vinayaggarwal271@gmail.com"
                className="flex items-center gap-3 bg-black/20 hover:bg-brand-brown transition-colors p-3 rounded-xl text-white group border border-white/10 justify-center md:justify-start"
@@ -74,8 +74,21 @@ export const Footer: React.FC = () => {
                 <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-lg transition-colors">
                   <Mail size={18} />
                 </div>
-                {/* FIXED: Added break-all to allow email to wrap on mobile */}
-                <span className="text-sm font-medium break-all text-left">vinayaggarwal271@gmail.com</span>
+                {/* Fixed font size for footer email too */}
+                <span className="text-[11px] sm:text-sm font-medium text-left">vinayaggarwal271@gmail.com</span>
+             </a>
+
+             {/* Option 3: WhatsApp (NEW) */}
+             <a 
+               href="https://wa.me/918826986127"
+               target="_blank"
+               rel="noreferrer"
+               className="flex items-center gap-3 bg-black/20 hover:bg-brand-green transition-colors p-3 rounded-xl text-white group border border-white/10 justify-center md:justify-start"
+             >
+                <div className="bg-white/10 group-hover:bg-white/20 p-2 rounded-lg transition-colors">
+                  <MessageCircle size={18} />
+                </div>
+                <span className="text-sm font-medium">WhatsApp Us</span>
              </a>
           </div>
         </div>
